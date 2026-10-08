@@ -19,7 +19,7 @@ from .agent import evaluate
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONTEXT_WINDOW = 3
 MAX_MESSAGES = 50
-MAX_QUOTA = 100  # سقف مصرف کلی برای کاربر
+MAX_QUOTA = 1000  # سقف مصرف کلی برای کاربر
 
 app = FastAPI(title="Lead Finder")
 db.init()
