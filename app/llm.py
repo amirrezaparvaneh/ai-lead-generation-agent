@@ -3,11 +3,14 @@ import time
 import httpx
 from typing import Dict, Any, Tuple
 
-# خواندن کلید API از متغیرهای محیطی یا فایل تنظیمات
-API_KEY = os.getenv("AVALAI_API_KEY", "کلید_ای_پی_آی_شما")  # اگر کلید هاردکد شده بود، اینجا جایگزین کن
+# این همان کلاسی است که جا افتاده بود و باعث خطای ۵۰۲ شد
+class LLMError(Exception):
+    pass
+
+# کلید API خودت را اینجا وارد کن
+API_KEY = os.getenv("AVALAI_API_KEY", "کلید_ای_پی_آی_شما")  
 BASE_URL = "https://api.avalai.ir/v1/chat/completions"
 
-# تنظیم یک کلاینت مشترک برای افزایش سرعت اتصال (Connection Pooling)
 client = httpx.Client(timeout=60.0)
 
 def _call(model: str, system: str, user: str, max_tokens: int, temperature: float) -> Dict[str, Any]:
@@ -37,12 +40,10 @@ def _call(model: str, system: str, user: str, max_tokens: int, temperature: floa
             return resp.json()
             
         except httpx.HTTPStatusError as e:
-            # اگر خطای ۴۲۹ (محدودیت درخواست) گرفتیم
             if e.response.status_code == 429:
                 if attempt == max_retries - 1:
-                    raise  # اگر تلاش‌ها تمام شد، ارور بده
+                    raise LLMError(f"Rate limit exceeded after {max_retries} attempts")
                 
-                # خواندن زمان انتظار از هدر AvalAI یا استفاده از تاخیر نمایی
                 retry_after = e.response.headers.get("Retry-After")
                 if retry_after and retry_after.isdigit():
                     wait_time = int(retry_after)
@@ -52,19 +53,17 @@ def _call(model: str, system: str, user: str, max_tokens: int, temperature: floa
                 print(f"Rate limit hit! Waiting {wait_time} seconds before retry (Attempt {attempt+1}/{max_retries})...")
                 time.sleep(wait_time)
             else:
-                # اگر خطای دیگری مثل ۵۰۰ یا ۴۰۱ بود، مستقیماً ارور بده
-                raise
+                raise LLMError(f"API Error: {e.response.status_code}")
+        except Exception as e:
+             raise LLMError(f"Request failed: {str(e)}")
 
 def chat_json(model: str, price: float, system: str, user: str) -> Tuple[Dict[str, Any], float]:
-    # استفاده از _call جدید که خودش مدیریت خطا دارد
     data = _call(model, system, user, max_tokens=1500, temperature=0.2)
     
-    # محاسبه هزینه بر اساس توکن‌های مصرفی
     usage = data.get("usage", {})
     prompt_tokens = usage.get("prompt_tokens", 0)
     completion_tokens = usage.get("completion_tokens", 0)
     
-    # فرض می‌کنیم قیمت ورودی و خروجی یکسان است (بر اساس هزار توکن)
     cost = ((prompt_tokens + completion_tokens) / 1000) * price
     
     import json
@@ -72,7 +71,6 @@ def chat_json(model: str, price: float, system: str, user: str) -> Tuple[Dict[st
     try:
         parsed_content = json.loads(content)
     except json.JSONDecodeError:
-        # در صورتی که خروجی دقیقا JSON معتبر نبود
         parsed_content = {"error": "Invalid JSON response", "raw": content}
         
     return parsed_content, cost
