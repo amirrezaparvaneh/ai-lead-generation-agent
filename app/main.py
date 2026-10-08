@@ -41,6 +41,7 @@ class ProductIn(BaseModel):
 
 class AnalyzeIn(BaseModel):
     messages: List[str]
+    source: str = "نامشخص" 
 
 class FeedbackIn(BaseModel):
     good: bool
@@ -140,7 +141,7 @@ def analyze(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
 
     def work(i):
         context = messages[max(0, i - CONTEXT_WINDOW):i]
-        return evaluate(product[0]["text"], messages[i], context)
+        return evaluate(product[0]["text"], messages[i], context, body.source)
 
     with ThreadPoolExecutor(max_workers=4) as pool:
         states = list(pool.map(work, range(len(messages))))
