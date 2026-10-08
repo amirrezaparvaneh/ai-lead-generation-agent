@@ -1,55 +1,78 @@
-import json
+import os
+import time
 import httpx
-from . import config
+from typing import Dict, Any, Tuple
 
+# خواندن کلید API از متغیرهای محیطی یا فایل تنظیمات
+API_KEY = os.getenv("AVALAI_API_KEY", "کلید_ای_پی_آی_شما")  # اگر کلید هاردکد شده بود، اینجا جایگزین کن
+BASE_URL = "https://api.avalai.ir/v1/chat/completions"
 
-class LLMError(Exception):
-    pass
+# تنظیم یک کلاینت مشترک برای افزایش سرعت اتصال (Connection Pooling)
+client = httpx.Client(timeout=60.0)
 
+def _call(model: str, system: str, user: str, max_tokens: int, temperature: float) -> Dict[str, Any]:
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user}
+        ],
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "response_format": {"type": "json_object"}
+    }
+    
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
 
-def _call(model, system, user, max_tokens, temperature):
-    resp = httpx.post(
-        f"{config.LLM_BASE_URL}/chat/completions",
-        headers={"Authorization": f"Bearer {config.LLM_API_KEY}"},
-        json={
-            "model": model,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "response_format": {"type": "json_object"},
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-        },
-        timeout=60,
-    )
-    resp.raise_for_status()
-    return resp.json()
+    max_retries = 5
+    base_wait = 2
 
-
-def chat_json(model, price, system, user, max_tokens=500):
-    """Call an OpenAI-compatible endpoint and return (parsed_json, usage).
-
-    The reply is capped by max_tokens. If it comes back cut off or is not valid
-    JSON, the call is retried once; the cost of both attempts is counted.
-    """
-    usage_total = {"tokens": 0, "cost": 0.0}
-    last_error = None
-
-    for attempt in range(2):
-        data = _call(model, system, user, max_tokens, 0.2 if attempt == 0 else 0)
-        usage = data["usage"]
-        usage_total["tokens"] += usage["total_tokens"]
-        usage_total["cost"] += (
-            usage["prompt_tokens"] * price[0] + usage["completion_tokens"] * price[1]
-        ) / 1e6
-
-        choice = data["choices"][0]
+    for attempt in range(max_retries):
         try:
-            if choice.get("finish_reason") == "length":
-                raise ValueError("reply was cut off at max_tokens")
-            return json.loads(choice["message"]["content"]), usage_total
-        except ValueError as e:
-            last_error = e
+            resp = client.post(BASE_URL, json=payload, headers=headers)
+            resp.raise_for_status()
+            return resp.json()
+            
+        except httpx.HTTPStatusError as e:
+            # اگر خطای ۴۲۹ (محدودیت درخواست) گرفتیم
+            if e.response.status_code == 429:
+                if attempt == max_retries - 1:
+                    raise  # اگر تلاش‌ها تمام شد، ارور بده
+                
+                # خواندن زمان انتظار از هدر AvalAI یا استفاده از تاخیر نمایی
+                retry_after = e.response.headers.get("Retry-After")
+                if retry_after and retry_after.isdigit():
+                    wait_time = int(retry_after)
+                else:
+                    wait_time = base_wait * (2 ** attempt)
+                
+                print(f"Rate limit hit! Waiting {wait_time} seconds before retry (Attempt {attempt+1}/{max_retries})...")
+                time.sleep(wait_time)
+            else:
+                # اگر خطای دیگری مثل ۵۰۰ یا ۴۰۱ بود، مستقیماً ارور بده
+                raise
 
-    raise LLMError(f"invalid JSON from model: {last_error}")
+def chat_json(model: str, price: float, system: str, user: str) -> Tuple[Dict[str, Any], float]:
+    # استفاده از _call جدید که خودش مدیریت خطا دارد
+    data = _call(model, system, user, max_tokens=1500, temperature=0.2)
+    
+    # محاسبه هزینه بر اساس توکن‌های مصرفی
+    usage = data.get("usage", {})
+    prompt_tokens = usage.get("prompt_tokens", 0)
+    completion_tokens = usage.get("completion_tokens", 0)
+    
+    # فرض می‌کنیم قیمت ورودی و خروجی یکسان است (بر اساس هزار توکن)
+    cost = ((prompt_tokens + completion_tokens) / 1000) * price
+    
+    import json
+    content = data["choices"][0]["message"]["content"]
+    try:
+        parsed_content = json.loads(content)
+    except json.JSONDecodeError:
+        # در صورتی که خروجی دقیقا JSON معتبر نبود
+        parsed_content = {"error": "Invalid JSON response", "raw": content}
+        
+    return parsed_content, cost
