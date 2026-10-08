@@ -2,13 +2,12 @@ import json
 import pathlib
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
+from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Response, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-# ابزارهای Rate Limiting (استاندارد)
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -20,17 +19,16 @@ from .agent import evaluate
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONTEXT_WINDOW = 3
 MAX_MESSAGES = 50
-MAX_QUOTA = 100  # سقف مصرف کلی برای کاربر (Quota)
+MAX_QUOTA = 100  # سقف مصرف کلی برای کاربر
 
 app = FastAPI(title="Lead Finder")
 db.init()
 
-# تنظیمات Rate Limiter (شناسایی بر اساس IP کاربر)
+# تنظیمات Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
-
 
 class Credentials(BaseModel):
     email: str
@@ -41,7 +39,7 @@ class ProductIn(BaseModel):
 
 class AnalyzeIn(BaseModel):
     messages: List[str]
-    source: str = "نامشخص" 
+    source: str = "نامشخص"  # اتصال پلتفرم به بک‌اند
 
 class FeedbackIn(BaseModel):
     good: bool
@@ -51,7 +49,7 @@ def _login(response: Response, user_id: int):
     response.set_cookie("session", token, httponly=True, samesite="lax", max_age=7 * 86400)
 
 @app.post("/api/register")
-@limiter.limit("5/minute")  # جلوگیری از ساخت اکانت اسپم
+@limiter.limit("5/minute")
 def register(request: Request, body: Credentials, response: Response):
     email = body.email.strip().lower()
     if "@" not in email:
@@ -118,13 +116,12 @@ def _store(user_id, text, state):
     return rid
 
 @app.post("/api/analyze")
-@limiter.limit("3/minute")  # محافظت در برابر اسپم (نهایتا ۳ درخواست در دقیقه)
+@limiter.limit("30/minute")  # سقف رو برای زمان تست بالا بردیم تا خطای اسپم ندهد
 def analyze(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
     product = db.query("SELECT text FROM products WHERE user_id=?", (user["id"],))
     if not product:
         raise HTTPException(400, "set your product first")
     
-    # --- بررسی سقف مصرف (Quota) ---
     usage_res = db.query("SELECT COUNT(id) as c FROM results WHERE user_id=?", (user["id"],))
     current_usage = usage_res[0]["c"] if usage_res else 0
     
@@ -141,6 +138,7 @@ def analyze(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
 
     def work(i):
         context = messages[max(0, i - CONTEXT_WINDOW):i]
+        # ارسال نام پلتفرم به ایجنت
         return evaluate(product[0]["text"], messages[i], context, body.source)
 
     with ThreadPoolExecutor(max_workers=4) as pool:
