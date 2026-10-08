@@ -35,6 +35,9 @@ def conn():
 def init():
     with conn() as c:
         c.executescript(SCHEMA)
+        if 'phone' not in {row['name'] for row in c.execute('PRAGMA table_info(users)')}:
+            c.execute('ALTER TABLE users ADD COLUMN phone TEXT')
+        c.execute('CREATE UNIQUE INDEX IF NOT EXISTS users_phone ON users(phone)')
 
 
 def query(sql, args=()):

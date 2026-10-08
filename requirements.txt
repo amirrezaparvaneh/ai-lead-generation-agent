@@ -4,3 +4,4 @@ langgraph
 pydantic
 httpx
 python-dotenv
+slowapi
