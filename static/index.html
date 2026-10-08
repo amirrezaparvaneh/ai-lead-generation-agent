@@ -211,32 +211,36 @@ $('#list').onclick = async e => {
 function renderStats(s) {
   const n = s.messages || 0, t = s.by_stage?.triage || 0, er = s.by_stage?.error || 0;
   const leads = s.leads || 0;
-  const rejected = n - (n - t - er) || 0; // کسانی که در غربال اول حذف شدند
-  const noFit = n - rejected - leads || 0; // بررسی شدند اما تناسب نداشتند
+  const rejected = n - (n - t - er) || 0; 
+  const noFit = n - rejected - leads || 0; 
   
-  // بروزرسانی نمودار
   const ctx = document.getElementById('funnelChart');
   if(chartInstance) chartInstance.destroy();
-  if (n > 0) {
-      chartInstance = new Chart(ctx, {
-          type: 'doughnut',
-          data: {
-              labels: ['رد شده (اسپم)', 'بدون تناسب', 'مشتری بالقوه'],
-              datasets: [{
-                  data: [rejected, noFit, leads],
-                  backgroundColor: ['#b3412f', '#f5b041', '#1d7a5a'],
-                  borderWidth: 0
-              }]
-          },
-          options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                  legend: { position: 'bottom', labels: { font: { family: 'Vazirmatn' }, boxWidth: 12 } }
-              }
+  
+  // تنظیم حالت بدون داده (وقتی هنوز پیامی تحلیل نشده)
+  const chartData = n > 0 ? [rejected, noFit, leads] : [1]; 
+  const chartColors = n > 0 ? ['#b3412f', '#f5b041', '#1d7a5a'] : ['#eceef5'];
+  const chartLabels = n > 0 ? ['رد شده (اسپم)', 'بدون تناسب', 'مشتری بالقوه'] : ['داده‌ای موجود نیست'];
+
+  chartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+          labels: chartLabels,
+          datasets: [{
+              data: chartData,
+              backgroundColor: chartColors,
+              borderWidth: 0
+          }]
+      },
+      options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+              legend: { position: 'bottom', labels: { font: { family: 'Vazirmatn' }, boxWidth: 12 } },
+              tooltip: { enabled: n > 0 } // غیرفعال کردن تولتیپ وقتی داده نیست
           }
-      });
-  }
+      }
+  });
 
   const rows = [['همه‌ی پیام‌ها', n, ''], ['رد نشده در غربال', n - t - er, ''], ['مشتری مناسب', leads, 'g']];
   const save = s.cost_if_all_deep > 0 ? Math.max(0, 1 - s.total_cost / s.cost_if_all_deep) : 0;
