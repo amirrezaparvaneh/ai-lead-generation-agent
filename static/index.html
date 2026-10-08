@@ -186,11 +186,11 @@
             </div>
 
             <!-- Step 1: Phone -->
-            <div id="step-phone">
+            <div id="step-phone" class="text-right">
                 <label class="block text-xs font-semibold text-slate-300 mb-2">شماره موبایل (۰۹...)</label>
                 <input type="text" id="otp-phone" placeholder="۰۹۱۲۳۴۵۶۷۸۹" 
                        oninput="formatPersianNumberInput(this)"
-                       class="w-full px-4 py-3.5 rounded-2xl bg-slate-900/90 border border-slate-700 text-white focus:outline-none focus:border-cyan-500 mb-5 text-center tracking-widest text-lg font-mono" 
+                       class="w-full px-4 py-3.5 rounded-2xl bg-slate-900/90 border border-slate-700 text-white focus:outline-none focus:border-cyan-500 mb-5 text-center tracking-widest text-lg font-sans" 
                        dir="rtl" maxlength="11" />
                 <button onclick="handleSendOTP()" id="btn-send-otp" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 rounded-2xl shadow-xl shadow-cyan-500/20 transition">
                     دریافت کد تایید
