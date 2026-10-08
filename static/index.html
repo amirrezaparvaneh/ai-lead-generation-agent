@@ -5,13 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>کاشف مشتری</title>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;800&display=swap" rel="stylesheet">
+<!-- اضافه کردن کتابخانه Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 :root{--bg:#f5f6fa;--card:#fff;--ink:#1b2236;--mute:#667085;--line:#dfe3ee;--brand:#2b3a8c;--lead:#1d7a5a;--leadbg:#e5f4ee;--bad:#b3412f}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.9 Vazirmatn,Tahoma,sans-serif}
 header{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:var(--card);border-bottom:1px solid var(--line)}
 header b{font-size:20px;font-weight:800;color:var(--brand)}
-main{max-width:1100px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start}
+main{max-width:1100px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start}
 section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:20px}
 h2{margin:0 0 4px;font-size:17px}
 p.hint{margin:0 0 12px;color:var(--mute);font-size:13px}
@@ -43,37 +45,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .bar i.g{background:var(--lead)}
 .kv{display:flex;justify-content:space-between;font-size:14px;padding:4px 0;border-top:1px solid var(--line)}
 .empty{color:var(--mute);padding:14px 0}
-
-/* استایل‌های جدید برای آپلود فایل و انتخاب پلتفرم */
-.file-upload {
-    position: relative;
-    overflow: hidden;
-    display: inline-block;
-}
-.file-upload input[type="file"] {
-    position: absolute;
-    font-size: 100px;
-    opacity: 0;
-    right: 0;
-    top: 0;
-    cursor: pointer;
-}
-.controls-group {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 12px;
-    align-items: center;
-}
-.source-select {
-    flex: 1;
-    max-width: 200px;
-}
-
-@media(max-width:820px){
-    main{grid-template-columns:1fr}
-    .controls-group { flex-direction: column; align-items: stretch; }
-    .source-select { max-width: 100%; }
-}
+.file-upload {position: relative; overflow: hidden; display: inline-block;}
+.file-upload input[type="file"] {position: absolute; font-size: 100px; opacity: 0; right: 0; top: 0; cursor: pointer;}
+.controls-group {display: flex; gap: 15px; margin-bottom: 12px; align-items: center;}
+.source-select {flex: 1; max-width: 200px;}
+.chart-container { position: relative; height: 220px; width: 100%; margin-bottom: 20px;}
+@media(max-width:820px){ main{grid-template-columns:1fr} .controls-group { flex-direction: column; align-items: stretch; } .source-select { max-width: 100%; } }
 </style>
 </head>
 <body>
@@ -138,6 +115,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
       </section>
     </div>
     <aside>
+      <section>
+        <h2>قیف فروش (آمار زنده)</h2>
+        <div class="chart-container">
+            <canvas id="funnelChart"></canvas>
+        </div>
+      </section>
       <section id="stats"></section>
     </aside>
   </main>
@@ -148,6 +131,7 @@ const $ = s => document.querySelector(s);
 const fa = (n, d = 0) => Number(n).toLocaleString('fa-IR', {maximumFractionDigits: d});
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let mode = 'login', results = [];
+let chartInstance = null; // متغیر نگهداری نمودار
 
 async function api(path, method = 'GET', body) {
   const r = await fetch(path, {method, headers: body ? {'Content-Type': 'application/json'} : {}, body: body ? JSON.stringify(body) : undefined});
@@ -175,32 +159,20 @@ $('#out').onclick = async () => { await api('/api/logout', 'POST').catch(() => {
 $('#sample').onclick = async () => { const s = await api('/api/sample'); $('#product').value = s.product; $('#msgs').value = s.messages.join('\n'); $('#msgSource').value = 'نامشخص'; };
 $('#all').onchange = renderList;
 
-// لاجیک آپلود فایل CSV
 $('#csvFile').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (!file) return;
-    
     say('#uploadStatus', 'در حال خواندن فایل...');
     const reader = new FileReader();
-    
     reader.onload = function(event) {
         const text = event.target.result;
-        // ساده‌ترین روش برای جدا کردن خطوط (با فرض اینکه هر خط یک پیام است)
-        const lines = text.split(/\r\n|\n/);
-        // حذف خطوط خالی احتمالی و پیوستن مجدد
-        const validLines = lines.filter(line => line.trim().length > 0);
-        
+        const validLines = text.split(/\r\n|\n/).filter(line => line.trim().length > 0);
         $('#msgs').value = validLines.join('\n');
         say('#uploadStatus', `${fa(validLines.length)} پیام با موفقیت بارگذاری شد.`);
     };
-    
-    reader.onerror = function() {
-        say('#uploadStatus', 'خطا در خواندن فایل.');
-    };
-    
+    reader.onerror = () => say('#uploadStatus', 'خطا در خواندن فایل.');
     reader.readAsText(file);
 });
-
 
 $('#run').onclick = async () => {
   const msgs = $('#msgs').value.split('\n').map(s => s.trim()).filter(Boolean);
@@ -237,8 +209,36 @@ $('#list').onclick = async e => {
 };
 
 function renderStats(s) {
-  const n = s.messages, t = s.by_stage.triage || 0, er = s.by_stage.error || 0;
-  const rows = [['همه‌ی پیام‌ها', n, ''], ['رد نشده در غربال', n - t - er, ''], ['مشتری مناسب', s.leads, 'g']];
+  const n = s.messages || 0, t = s.by_stage?.triage || 0, er = s.by_stage?.error || 0;
+  const leads = s.leads || 0;
+  const rejected = n - (n - t - er) || 0; // کسانی که در غربال اول حذف شدند
+  const noFit = n - rejected - leads || 0; // بررسی شدند اما تناسب نداشتند
+  
+  // بروزرسانی نمودار
+  const ctx = document.getElementById('funnelChart');
+  if(chartInstance) chartInstance.destroy();
+  if (n > 0) {
+      chartInstance = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+              labels: ['رد شده (اسپم)', 'بدون تناسب', 'مشتری بالقوه'],
+              datasets: [{
+                  data: [rejected, noFit, leads],
+                  backgroundColor: ['#b3412f', '#f5b041', '#1d7a5a'],
+                  borderWidth: 0
+              }]
+          },
+          options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                  legend: { position: 'bottom', labels: { font: { family: 'Vazirmatn' }, boxWidth: 12 } }
+              }
+          }
+      });
+  }
+
+  const rows = [['همه‌ی پیام‌ها', n, ''], ['رد نشده در غربال', n - t - er, ''], ['مشتری مناسب', leads, 'g']];
   const save = s.cost_if_all_deep > 0 ? Math.max(0, 1 - s.total_cost / s.cost_if_all_deep) : 0;
   $('#stats').innerHTML = `<h2>هزینه و کیفیت</h2><p class="hint">هر پیام از چند مرحله می‌گذرد؛ مرحله‌های گران فقط برای پیام‌های مرتبط اجرا می‌شود.</p>` +
     rows.map(([l, v, c]) => `<div class="fn"><div class="l"><span>${l}</span><b>${fa(v)}</b></div><div class="bar"><i class="${c}" style="width:${n ? v / n * 100 : 0}%"></i></div></div>`).join('') +
