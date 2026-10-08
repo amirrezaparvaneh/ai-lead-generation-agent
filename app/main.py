@@ -115,9 +115,9 @@ def _store(user_id, text, state):
     )
     return rid
 
-@app.post("/api/analyze")
+@app.post("/api/process")
 @limiter.limit("30/minute")  # سقف رو برای زمان تست بالا بردیم تا خطای اسپم ندهد
-def analyze(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
+def process(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
     product = db.query("SELECT text FROM products WHERE user_id=?", (user["id"],))
     if not product:
         raise HTTPException(400, "set your product first")

@@ -134,11 +134,24 @@ let mode = 'login', results = [];
 let chartInstance = null; // متغیر نگهداری نمودار
 
 async function api(path, method = 'GET', body) {
-  const r = await fetch(path, {method, headers: body ? {'Content-Type': 'application/json'} : {}, body: body ? JSON.stringify(body) : undefined});
+  let r;
+  try {
+    r = await fetch(path, {method, headers: body ? {'Content-Type': 'application/json'} : {}, body: body ? JSON.stringify(body) : undefined});
+  } catch (e) {
+    throw new Error('خطا در ارتباط با سرور. لطفاً وضعیت اینترنت را بررسی کنید یا چند لحظه دیگر تلاش کنید.');
+  }
   if (!r.ok) {
     if (r.status === 401 && !path.match(/login|register/)) show(false);
     const e = await r.json().catch(() => ({}));
-    throw new Error(typeof e.detail === 'string' ? e.detail : 'ورودی نامعتبر است');
+    // اگر ارور از سمت بک‌اند متن مشخصی داشت آن را نشان بده، در غیر این صورت پیام فارسی پیش‌فرض
+    let errorMsg = typeof e.detail === 'string' ? e.detail : 'خطای داخلی سرور رخ داده است.';
+    
+    // ترجمه خطاهای رایج دیتابیس و اعتبارسنجی
+    if (errorMsg === 'set your product first') errorMsg = 'لطفاً ابتدا محصول خود را ثبت کنید.';
+    if (errorMsg === 'no messages') errorMsg = 'پیامی برای بررسی وجود ندارد.';
+    if (errorMsg === 'invalid email') errorMsg = 'فرمت ایمیل نامعتبر است.';
+    
+    throw new Error(errorMsg);
   }
   return r.json();
 }
@@ -182,7 +195,7 @@ $('#run').onclick = async () => {
   say('#err'); $('#run').disabled = true; $('#run').textContent = 'در حال بررسی…';
   try {
     await api('/api/product', 'PUT', {text: $('#product').value});
-    await api('/api/analyze', 'POST', {messages: msgs, source: source});
+    await api('/api/process', 'POST', {messages: msgs, source: source});
     await refresh();
   } catch (x) { say('#err', x.message); }
   $('#run').disabled = false; $('#run').textContent = 'پیدا کردن مشتری‌ها';
