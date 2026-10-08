@@ -141,7 +141,7 @@ def process(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
         # ارسال نام پلتفرم به ایجنت
         return evaluate(product[0]["text"], messages[i], context, body.source)
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    with ThreadPoolExecutor(max_workers=1) as pool:
         states = list(pool.map(work, range(len(messages))))
     ids = [_store(user["id"], t, s) for t, s in zip(messages, states)]
     
@@ -153,6 +153,12 @@ def results(only_leads: bool = False, user=Depends(auth.current_user)):
     if only_leads:
         sql += " AND is_lead=1"
     return db.query(sql + " ORDER BY id DESC", (user["id"],))
+
+@app.delete("/api/results")
+def clear_results(user=Depends(auth.current_user)):
+    with db.conn() as c:
+        deleted = c.execute("DELETE FROM results WHERE user_id=?", (user["id"],)).rowcount
+    return {"ok": True, "deleted": deleted}
 
 @app.post("/api/results/{result_id}/feedback")
 def feedback(result_id: int, body: FeedbackIn, user=Depends(auth.current_user)):

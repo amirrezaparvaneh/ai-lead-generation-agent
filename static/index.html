@@ -22,6 +22,8 @@ textarea{min-height:110px;resize:vertical}
 input[type=email],input[type=password]{direction:ltr;text-align:left;margin-bottom:10px}
 button, .btn-link{font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 14px;color:var(--ink); display: inline-block; text-decoration: none; text-align: center;}
 button.go{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+#clearResults{color:var(--bad);border-color:var(--bad)}
+#clearResults:hover:not(:disabled){background:#fff1ee}
 button:disabled{opacity:.5;cursor:wait}
 button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center}
@@ -109,7 +111,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
       <section>
         <div class="row" style="justify-content:space-between;margin:0">
           <h2>نتیجه‌ها</h2>
-          <label><input type="checkbox" id="all" style="width:auto"> نمایش پیام‌های ردشده</label>
+          <div class="row" style="margin:0"><label><input type="checkbox" id="all" style="width:auto"> نمایش پیام‌های ردشده</label><button id="clearResults" type="button">پاک کردن پیام‌ها و آمار</button></div>
         </div>
         <div id="list"></div>
       </section>
@@ -171,6 +173,30 @@ $('#authForm').onsubmit = async e => {
 $('#out').onclick = async () => { await api('/api/logout', 'POST').catch(() => {}); show(false); };
 $('#sample').onclick = async () => { const s = await api('/api/sample'); $('#product').value = s.product; $('#msgs').value = s.messages.join('\n'); $('#msgSource').value = 'نامشخص'; };
 $('#all').onchange = renderList;
+$('#clearResults').onclick = async () => {
+  if (!window.confirm('همه پیام‌ها، نتیجه‌ها، بازخوردها و آمار این حساب پاک می‌شوند. این کار برگشت‌پذیر نیست. ادامه می‌دهید؟')) return;
+  const button = $('#clearResults');
+  button.disabled = true;
+  button.textContent = 'در حال پاک‌سازی…';
+  $('#run').disabled = true;
+  say('#err');
+  try {
+    await api('/api/results', 'DELETE');
+    results = [];
+    renderList();
+    renderStats({total_cost: 0, avg_cost_per_message: 0, cost_if_all_deep: 0, rated_leads: 0});
+    $('#msgs').value = '';
+    $('#csvFile').value = '';
+    say('#uploadStatus');
+    await refresh();
+  } catch (e) {
+    say('#err', e.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'پاک کردن پیام‌ها و آمار';
+    $('#run').disabled = false;
+  }
+};
 
 $('#csvFile').addEventListener('change', function(e) {
     const file = e.target.files[0];
@@ -192,13 +218,13 @@ $('#run').onclick = async () => {
   const source = $('#msgSource').value;
   
   if ($('#product').value.trim().length < 10 || !msgs.length) return say('#err', 'محصول و حداقل یک پیام لازم است.');
-  say('#err'); $('#run').disabled = true; $('#run').textContent = 'در حال بررسی…';
+  say('#err'); $('#run').disabled = true; $('#clearResults').disabled = true; $('#run').textContent = 'در حال بررسی…';
   try {
     await api('/api/product', 'PUT', {text: $('#product').value});
     await api('/api/process', 'POST', {messages: msgs, source: source});
     await refresh();
   } catch (x) { say('#err', x.message); }
-  $('#run').disabled = false; $('#run').textContent = 'پیدا کردن مشتری‌ها';
+  $('#run').disabled = false; $('#clearResults').disabled = false; $('#run').textContent = 'پیدا کردن مشتری‌ها';
 };
 
 function renderList() {
