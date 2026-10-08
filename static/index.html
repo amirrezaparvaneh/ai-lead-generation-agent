@@ -28,9 +28,23 @@ button.go{background:var(--brand);border-color:var(--brand);color:#fff;font-weig
 button:disabled{opacity:.5;cursor:wait}
 button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center}
-.auth{max-width:380px;margin:60px auto}
-.tabs{display:flex;gap:8px;margin-bottom:14px}
-.tab.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.auth{max-width:448px;margin:60px auto;padding:0 16px}
+#auth-card{padding:24px;background:#0f172a;border:1px solid #1e293b;border-radius:16px;box-shadow:0 16px 32px #0f172a22;color:#fff}
+#auth-card h2{font-size:20px;margin-bottom:8px}
+#auth-card .hint{color:#94a3b8;margin-bottom:24px}
+#auth-card label{display:block;font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:8px}
+#auth-card input{background:#1e293b;border-color:#334155;color:#fff;border-radius:12px;margin-bottom:16px}
+#auth-card input:focus-visible{outline-color:#06b6d4}
+#auth-card .otp-primary{width:100%;background:#0891b2;border:0;color:#fff;font-weight:600;border-radius:12px;padding:10px}
+#auth-card .otp-primary:hover:not(:disabled){background:#0e7490}
+#auth-card #btn-verify-otp{background:#059669}
+#auth-card .otp-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:#94a3b8}
+#auth-card .otp-link{border:0;background:none;color:#22d3ee;padding:0;font-size:12px}
+#auth-card button:disabled{cursor:not-allowed}
+#auth-card .err{color:#fca5a5}
+#otp-phone{direction:ltr;text-align:left}
+#otp-code{direction:ltr;text-align:center;letter-spacing:8px;font-size:20px}
+#otp-timer{direction:ltr;font-variant-numeric:tabular-nums}
 .err{color:var(--bad);font-size:13px;margin-top:8px;min-height:20px}
 .item{border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:12px}
 .item.lead{border-color:#9fd3bd;background:var(--leadbg)}
@@ -58,19 +72,27 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 </head>
 <body>
 <div id="auth" class="auth" hidden>
-  <section>
-    <h2>کاشف مشتری</h2>
-    <p class="hint">پیام‌های یک گروه را بده؛ فقط کسانی را می‌بینی که واقعاً به محصولت نیاز دارند.</p>
-    <div class="tabs">
-      <button class="tab on" data-m="login">ورود</button>
-      <button class="tab" data-m="register">ثبت‌نام</button>
-    </div>
-    <form id="authForm">
-      <input id="email" type="email" placeholder="ایمیل" required>
-      <input id="pw" type="password" placeholder="رمز عبور (حداقل ۶ کاراکتر)" required>
-      <button id="authBtn" class="go" style="width:100%">ورود</button>
+  <section id="auth-card" dir="rtl">
+    <h2>ورود / ثبت‌نام در سامانه</h2>
+    <p class="hint" id="otp-hint" role="status">شماره موبایل خود را وارد کنید تا کد تایید برایتان ارسال شود.</p>
+    <form id="step-phone" novalidate>
+      <label for="otp-phone">شماره موبایل</label>
+      <input type="tel" id="otp-phone" placeholder="۰۹۱۲۳۴۵۶۷۸۹" dir="ltr" maxlength="11" inputmode="numeric" autocomplete="tel-national" aria-describedby="authErr" required>
+      <button type="submit" id="btn-send-otp" class="otp-primary">دریافت کد تایید</button>
     </form>
-    <div class="err" id="authErr"></div>
+    <form id="step-code" hidden novalidate>
+      <div class="otp-row">
+        <label for="otp-code">کد تایید ۴ رقمی</label>
+        <button type="button" id="btn-edit-phone" class="otp-link">ویرایش شماره</button>
+      </div>
+      <input type="text" id="otp-code" placeholder="----" maxlength="4" inputmode="numeric" autocomplete="one-time-code" aria-describedby="authErr" required>
+      <div class="otp-row">
+        <span id="otp-timer" role="timer" aria-label="زمان باقی‌مانده تا ارسال مجدد">۰۲:۰۰</span>
+        <button type="button" id="btn-resend" class="otp-link" disabled>ارسال مجدد کد</button>
+      </div>
+      <button type="submit" id="btn-verify-otp" class="otp-primary">تایید و ورود</button>
+    </form>
+    <div class="err" id="authErr" role="alert"></div>
   </section>
 </div>
 
@@ -133,7 +155,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 const $ = s => document.querySelector(s);
 const fa = (n, d = 0) => Number(n).toLocaleString('fa-IR', {maximumFractionDigits: d});
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let mode = 'login', results = [];
+let results = [];
 let chartInstance = null; // متغیر نگهداری نمودار
 
 async function api(path, method = 'GET', body) {
@@ -161,16 +183,89 @@ async function api(path, method = 'GET', body) {
 const show = ok => { $('#auth').hidden = ok; $('#app').hidden = !ok; };
 const say = (sel, t) => { $(sel).textContent = t || ''; };
 
-document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
-  mode = t.dataset.m;
-  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
-  $('#authBtn').textContent = mode === 'login' ? 'ورود' : 'ساخت حساب';
-});
-$('#authForm').onsubmit = async e => {
-  e.preventDefault();
-  try { await api('/api/' + mode, 'POST', {email: $('#email').value, password: $('#pw').value}); say('#authErr'); await boot(); }
-  catch (x) { say('#authErr', x.message === 'wrong email or password' ? 'ایمیل یا رمز اشتباه است' : x.message === 'email already registered' ? 'این ایمیل قبلاً ثبت شده' : x.message); }
-};
+const normalizeDigits = value => value.replace(/[۰-۹]/g, c => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[٠-٩]/g, c => String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).trim();
+let otpBusy = false, otpPhone = '', otpDeadline = 0, otpInterval = null;
+
+function startTimer(seconds) {
+  clearInterval(otpInterval);
+  otpDeadline = Date.now() + Math.max(0, seconds) * 1000;
+  otpInterval = setInterval(updateOTPTimer, 1000);
+  updateOTPTimer();
+}
+function updateOTPTimer() {
+  const seconds = Math.max(0, Math.ceil((otpDeadline - Date.now()) / 1000));
+  const clock = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+  $('#otp-timer').textContent = clock.replace(/[0-9]/g, c => '۰۱۲۳۴۵۶۷۸۹'[Number(c)]);
+  $('#btn-resend').disabled = otpBusy || seconds > 0;
+  $('#btn-send-otp').disabled = otpBusy || seconds > 0;
+  if (!seconds) { clearInterval(otpInterval); otpInterval = null; }
+}
+function setOTPBusy(busy) {
+  otpBusy = busy;
+  ['#btn-verify-otp', '#btn-edit-phone', '#otp-phone', '#otp-code'].forEach(id => $(id).disabled = busy);
+  updateOTPTimer();
+}
+function backToPhoneStep() {
+  if (otpBusy) return;
+  $('#step-code').hidden = true;
+  $('#step-phone').hidden = false;
+  $('#otp-code').value = '';
+  say('#authErr');
+  say('#otp-hint', otpDeadline > Date.now() ? 'شماره را ویرایش کنید؛ برای ارسال کد جدید تا پایان زمان انتظار صبر کنید.' : 'شماره موبایل خود را وارد کنید تا کد تایید برایتان ارسال شود.');
+  $('#otp-phone').focus();
+}
+async function handleSendOTP() {
+  if (otpBusy || Date.now() < otpDeadline) return;
+  const phone = normalizeDigits($('#otp-phone').value);
+  if (!/^09[0-9]{9}$/.test(phone)) return say('#authErr', 'شماره موبایل معتبر ۱۱ رقمی وارد کنید. مثال: 09123456789');
+  say('#authErr');
+  setOTPBusy(true);
+  $('#btn-send-otp').textContent = 'در حال ارسال…';
+  try {
+    await api('/api/auth/send-otp', 'POST', {phone});
+    otpPhone = phone;
+    $('#otp-phone').value = phone;
+    $('#otp-code').value = '';
+    $('#step-phone').hidden = true;
+    $('#step-code').hidden = false;
+    say('#otp-hint', `کد تایید برای شماره ${phone} ارسال شد.`);
+    startTimer(120);
+  } catch (e) { say('#authErr', e.message); }
+  finally {
+    setOTPBusy(false);
+    $('#btn-send-otp').textContent = 'دریافت کد تایید';
+    if (!$('#step-code').hidden) $('#otp-code').focus();
+  }
+}
+async function handleVerifyOTP() {
+  if (otpBusy || !otpPhone) return;
+  const code = normalizeDigits($('#otp-code').value);
+  if (!/^[0-9]{4}$/.test(code)) return say('#authErr', 'کد تایید باید ۴ رقم باشد.');
+  say('#authErr');
+  setOTPBusy(true);
+  $('#btn-verify-otp').textContent = 'در حال بررسی…';
+  try {
+    await api('/api/auth/verify-otp', 'POST', {phone: otpPhone, code});
+    // ورود فقط با نشست معتبر سرور تایید می‌شود، نه صرفاً پاسخ موفق بررسی کد.
+    await api('/api/me');
+    clearInterval(otpInterval);
+    otpDeadline = 0;
+    otpPhone = '';
+    $('#otp-code').value = '';
+    $('#step-code').hidden = true;
+    $('#step-phone').hidden = false;
+    say('#otp-hint', 'شماره موبایل خود را وارد کنید تا کد تایید برایتان ارسال شود.');
+    await boot();
+  } catch (e) { say('#authErr', e.message); }
+  finally {
+    setOTPBusy(false);
+    $('#btn-verify-otp').textContent = 'تایید و ورود';
+  }
+}
+$('#step-phone').onsubmit = e => { e.preventDefault(); handleSendOTP(); };
+$('#step-code').onsubmit = e => { e.preventDefault(); handleVerifyOTP(); };
+$('#btn-edit-phone').onclick = backToPhoneStep;
+$('#btn-resend').onclick = handleSendOTP;
 $('#out').onclick = async () => { await api('/api/logout', 'POST').catch(() => {}); show(false); };
 $('#sample').onclick = async () => { const s = await api('/api/sample'); $('#product').value = s.product; $('#msgs').value = s.messages.join('\n'); $('#msgSource').value = 'نامشخص'; };
 $('#all').onchange = renderList;
@@ -301,7 +396,7 @@ async function refresh() {
 async function boot() {
   try {
     const me = await api('/api/me');
-    show(true); $('#who').textContent = me.email;
+    show(true); $('#who').textContent = me.phone || me.email;
     if (me.product) $('#product').value = me.product;
     await refresh();
   } catch { show(false); }

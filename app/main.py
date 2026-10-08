@@ -1,5 +1,7 @@
 import json
 import pathlib
+import re
+import secrets
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
@@ -15,6 +17,8 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from . import auth, db
 from .agent import evaluate
+
+from .sms import generate_otp, verify_otp_code, send_sms_melipayamak
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONTEXT_WINDOW = 3
@@ -82,7 +86,7 @@ def logout(response: Response, user=Depends(auth.current_user)):
 @app.get("/api/me")
 def me(user=Depends(auth.current_user)):
     product = db.query("SELECT text FROM products WHERE user_id=?", (user["id"],))
-    return {"email": user["email"], "product": product[0]["text"] if product else None}
+    return {"email": user["email"], "phone": user["phone"], "product": product[0]["text"] if product else None}
 
 @app.put("/api/product")
 def set_product(body: ProductIn, user=Depends(auth.current_user)):
@@ -171,6 +175,55 @@ def feedback(result_id: int, body: FeedbackIn, user=Depends(auth.current_user)):
 @app.get("/api/stats")
 def stats(user=Depends(auth.current_user)):
     return db.stats(user["id"])
+
+class SendOTPRequest(BaseModel):
+    phone: str
+
+class VerifyOTPRequest(BaseModel):
+    phone: str
+    code: str
+
+@app.post("/api/auth/send-otp")
+@limiter.limit("3/minute")
+def send_otp_endpoint(request: Request, req: SendOTPRequest):
+    phone = req.phone.strip()
+    if not re.fullmatch(r"09\d{9}", phone):
+        raise HTTPException(status_code=400, detail="شماره موبایل باید ۱۱ رقمی و با ۰۹ شروع شود.")
+
+    code = generate_otp(phone)
+    if not send_sms_melipayamak(phone, code):
+        from .sms import OTP_CACHE, OTP_ATTEMPTS, OTP_LOCK
+        with OTP_LOCK:
+            OTP_CACHE.pop(phone, None)
+            OTP_ATTEMPTS.pop(phone, None)
+        raise HTTPException(status_code=502, detail="ارسال پیامک ناموفق بود؛ تنظیمات پنل و الگوی پیامک را بررسی کنید.")
+
+    return {"status": "success", "message": "کد تایید ارسال گردید."}
+
+@app.post("/api/auth/verify-otp")
+@limiter.limit("5/minute")
+def verify_otp_endpoint(request: Request, req: VerifyOTPRequest, response: Response):
+    phone = req.phone.strip()
+    code = req.code.strip()
+    if not re.fullmatch(r"09\d{9}", phone) or not re.fullmatch(r"\d{4}", code):
+        raise HTTPException(status_code=400, detail="شماره موبایل یا کد تایید معتبر نیست.")
+    if not verify_otp_code(phone, code):
+        raise HTTPException(status_code=400, detail="کد وارد شده اشتباه است یا منقضی شده.")
+
+    with db.conn() as conn:
+        row = conn.execute("SELECT id FROM users WHERE phone=?", (phone,)).fetchone()
+        if row:
+            user_id = row["id"]
+        else:
+            # حساب OTP ایمیل/رمز عبور ندارد؛ از جعل یا تداخل ایمیل جلوگیری می‌کند.
+            email = f"{secrets.token_hex(24)}@otp.invalid"
+            user_id = conn.execute(
+                "INSERT INTO users(email, pw, phone) VALUES(?, ?, ?)",
+                (email, auth.hash_password(secrets.token_urlsafe(32)), phone),
+            ).lastrowid
+
+    _login(response, user_id)
+    return {"status": "success", "message": "ورود با موفقیت انجام شد.", "phone": phone}
 
 STATIC = ROOT / "static"
 if STATIC.exists():
