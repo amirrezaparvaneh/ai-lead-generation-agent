@@ -29,7 +29,7 @@ def current_user(session: Optional[str] = Cookie(default=None)):
     rows = []
     if session:
         rows = db.query(
-            "SELECT u.id, u.email, u.phone FROM sessions s JOIN users u ON u.id = s.user_id "
+            "SELECT u.id, u.email, u.phone, u.first_name, u.last_name FROM sessions s JOIN users u ON u.id = s.user_id "
             "WHERE s.token = ?",
             (session,),
         )

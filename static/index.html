@@ -196,16 +196,17 @@ dialog .btn{width:100%;padding:13px}
 
 <dialog id="dlg" aria-labelledby="dt">
   <div class="dh"><h3 id="dt">ورود به نشانه</h3><button class="x" id="close" aria-label="بستن">×</button></div>
-  <div id="s1">
-    <label for="phone">شماره‌ی موبایل (با ۰۹ شروع شود)</label>
-    <input class="in" id="phone" inputmode="numeric" maxlength="11" placeholder="۰۹۱۲۳۴۵۶۷۸۹" autocomplete="tel">
-    <button class="btn p" id="send">دریافت کد تأیید</button>
+  <div id="emailAuth">
+    <div class="row"><button id="loginTab">ورود</button><button id="registerTab">ثبت‌نام</button></div>
+    <div id="nameFields" hidden><label for="firstName">نام</label><input class="in" id="firstName" autocomplete="given-name"><label for="lastName">نام خانوادگی</label><input class="in" id="lastName" autocomplete="family-name"></div>
+    <label for="email">ایمیل</label><input class="in" id="email" type="email" autocomplete="email" placeholder="you@example.com">
+    <label for="password">رمز عبور</label><input class="in" id="password" type="password" minlength="6" autocomplete="current-password" placeholder="حداقل ۶ کاراکتر">
+    <button class="btn p" id="emailSubmit">ورود</button>
   </div>
-  <div id="s2" hidden>
-    <div class="row"><label for="code" style="margin:0">کد تأیید ۴ رقمی</label><button id="edit">ویرایش شماره</button></div>
-    <input class="in" id="code" inputmode="numeric" maxlength="4" placeholder="----" autocomplete="one-time-code">
-    <div class="row"><span id="tm"></span><button id="again" disabled>ارسال مجدد</button></div>
-    <button class="btn p" id="verify">تأیید و ورود به داشبورد</button>
+  <p class="note" style="text-align:center;margin:15px 0 0">ورود یا ثبت‌نام با <button id="mobileToggle" style="border:0;background:none;color:var(--blue);cursor:pointer;font:inherit">شماره تلفن</button></p>
+  <div id="mobileAuth" hidden>
+    <div id="s1"><label for="phone">شماره‌ی موبایل (با ۰۹ شروع شود)</label><input class="in" id="phone" inputmode="numeric" maxlength="11" placeholder="۰۹۱۲۳۴۵۶۷۸۹" autocomplete="tel"><button class="btn p" id="send">دریافت کد تأیید</button></div>
+    <div id="s2" hidden><div class="row"><label for="code" style="margin:0">کد تأیید ۴ رقمی</label><button id="edit">ویرایش شماره</button></div><input class="in" id="code" inputmode="numeric" maxlength="4" placeholder="----" autocomplete="one-time-code"><div class="row"><span id="tm"></span><button id="again" disabled>ارسال مجدد</button></div><button class="btn p" id="verify">تأیید و ورود به داشبورد</button></div>
   </div>
   <p class="err" id="err" role="alert"></p>
 </dialog>
@@ -226,6 +227,21 @@ const digits = el => el.oninput = () => { el.value = fa(el.value.replace(/[^0-9�
 digits($('#phone')); digits($('#code'));
 const err = t => { $('#err').textContent = t || ''; };
 const busy = (b, on) => { b.disabled = on; };
+let registering = false;
+$('#loginTab').onclick = () => setEmailMode(false);
+$('#registerTab').onclick = () => setEmailMode(true);
+function setEmailMode(isRegister) { registering = isRegister; $('#nameFields').hidden = !isRegister; $('#emailSubmit').textContent = isRegister ? 'ساخت حساب و ورود' : 'ورود'; err(''); }
+$('#mobileToggle').onclick = () => { const mobile = $('#mobileAuth'); mobile.hidden = !mobile.hidden; $('#emailAuth').hidden = !mobile.hidden; };
+async function emailAuth() {
+  const email = $('#email').value.trim(), password = $('#password').value;
+  const body = { email, password };
+  if (registering) { body.first_name = $('#firstName').value.trim(); body.last_name = $('#lastName').value.trim(); if (!body.first_name || !body.last_name) return err('نام و نام خانوادگی را وارد کنید.'); }
+  err(''); busy($('#emailSubmit'), true);
+  try { await post(registering ? '/api/register' : '/api/login', body); location.href = '/dashboard.html'; }
+  catch (e) { err(e.message); busy($('#emailSubmit'), false); }
+}
+$('#emailSubmit').onclick = emailAuth;
+$('#password').onkeydown = e => { if (e.key === 'Enter') emailAuth(); };
 
 function startTimer() {
   timer = 120; clearInterval(tick);

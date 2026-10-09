@@ -44,6 +44,11 @@ class Credentials(BaseModel):
     email: str
     password: str = Field(min_length=6)
 
+
+class RegistrationIn(Credentials):
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(min_length=1, max_length=80)
+
 class ProductIn(BaseModel):
     text: str = Field(min_length=10, max_length=2000)
 
@@ -89,19 +94,19 @@ def _login(response: Response, user_id: int):
 
 @app.post("/api/register")
 @limiter.limit("5/minute")
-def register(request: Request, body: Credentials, response: Response):
+def register(request: Request, body: RegistrationIn, response: Response):
     email = body.email.strip().lower()
     if "@" not in email:
         raise HTTPException(400, "invalid email")
     try:
         user_id = db.execute(
-            "INSERT INTO users(email, pw) VALUES(?, ?)",
-            (email, auth.hash_password(body.password)),
+            "INSERT INTO users(email, pw, first_name, last_name) VALUES(?, ?, ?, ?)",
+            (email, auth.hash_password(body.password), body.first_name.strip(), body.last_name.strip()),
         )
     except sqlite3.IntegrityError:
         raise HTTPException(409, "email already registered")
     _login(response, user_id)
-    return {"email": email}
+    return {"email": email, "first_name": body.first_name.strip(), "last_name": body.last_name.strip()}
 
 @app.post("/api/login")
 @limiter.limit("10/minute")
@@ -110,7 +115,8 @@ def login(request: Request, body: Credentials, response: Response):
     if not rows or not auth.check_password(body.password, rows[0]["pw"]):
         raise HTTPException(401, "wrong email or password")
     _login(response, rows[0]["id"])
-    return {"email": body.email.strip().lower()}
+    user = db.query("SELECT first_name, last_name FROM users WHERE id=?", (rows[0]["id"],))[0]
+    return {"email": body.email.strip().lower(), "first_name": user["first_name"], "last_name": user["last_name"]}
 
 @app.post("/api/logout")
 def logout(response: Response, user=Depends(auth.current_user)):
@@ -121,7 +127,7 @@ def logout(response: Response, user=Depends(auth.current_user)):
 @app.get("/api/me")
 def me(user=Depends(auth.current_user)):
     product = db.query("SELECT text FROM products WHERE user_id=?", (user["id"],))
-    return {"email": user["email"], "phone": user["phone"], "product": product[0]["text"] if product else None}
+    return {"email": user["email"], "phone": user["phone"], "first_name": user["first_name"], "last_name": user["last_name"], "product": product[0]["text"] if product else None}
 
 @app.put("/api/product")
 def set_product(body: ProductIn, user=Depends(auth.current_user)):
