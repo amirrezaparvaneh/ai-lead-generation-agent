@@ -142,6 +142,19 @@ def reject_report(report_id, note):
             raise ValueError("report not found or already reviewed")
 
 
+def purchase_subscription(user_id, plan, message_credit, amount):
+    with conn() as c:
+        c.execute("INSERT OR IGNORE INTO wallets(user_id) VALUES(?)", (user_id,))
+        c.execute(
+            "UPDATE wallets SET message_credit=message_credit+?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?",
+            (message_credit, user_id),
+        )
+        c.execute(
+            "INSERT INTO wallet_transactions(user_id, message_credit, rial_credit, description) VALUES(?,?,?,?)",
+            (user_id, message_credit, 0, f"خرید اشتراک {plan} — پرداخت {amount:,} ریال"),
+        )
+
+
 def credit_user(user_id, message_credit, rial_credit, note):
     with conn() as c:
         if not c.execute("SELECT 1 FROM users WHERE id=?", (user_id,)).fetchone():

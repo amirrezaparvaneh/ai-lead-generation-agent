@@ -37,7 +37,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .why{color:var(--mute);font-size:13px;margin:6px 0}
 .draft{background:#fff;border:1px dashed #9fd3bd;border-radius:8px;padding:10px;margin:8px 0;white-space:pre-wrap}
 .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--mute)}
-.sender{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}.sender-name{font-weight:700}.sender-handle{color:var(--brand);font-size:13px;direction:ltr;text-align:right}.lead-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.lead-actions a,.lead-actions button{font-size:13px;text-decoration:none}.telegram{background:#229ED9;color:#fff;border-color:#229ED9}.outline{background:transparent}
+.sender{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}.sender-name{font-weight:700}.sender-handle{color:var(--brand);font-size:13px;direction:ltr;text-align:right}.lead-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.lead-actions a,.lead-actions button{font-size:13px;text-decoration:none}.feedback{transition:background .18s,color .18s,border-color .18s}.feedback.good.on{background:#15803d;color:#fff;border-color:#15803d}.feedback.bad.on{background:#b91c1c;color:#fff;border-color:#b91c1c}.telegram{background:#229ED9;color:#fff;border-color:#229ED9}.outline{background:transparent}.file-input{max-width:320px;padding:6px;font-size:13px}.upload-note{font-size:12px;color:var(--mute);margin:4px 0 0}
 .fn div.l{display:flex;justify-content:space-between;font-size:13px}
 .bar{height:10px;background:#eceef5;border-radius:6px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--brand)}
@@ -67,7 +67,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 </div>
 
 <div id="app" hidden>
-  <header><b>نشانه</b><span><span id="who" style="display:inline-block;margin-left:8px"></span> <a href="/rewards.html" style="margin-left:12px;color:var(--brand);text-decoration:none">کیف پول و بازخورد</a> <button id="out">خروج</button></span></header>
+  <header><b>نشانه</b><span><span id="who" style="display:inline-block;margin-left:8px"></span><b id="credit" style="font-size:13px;color:var(--lead);margin-left:8px"></b> <a href="/rewards.html" style="margin-left:12px;color:var(--brand);text-decoration:none">کیف پول و بازخورد</a> <button id="out">خروج</button></span></header>
   <main>
     <div>
       <section>
@@ -80,9 +80,11 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
         <p class="hint">هر پیام در یک خط. پیام‌های قبلی به‌عنوان زمینه‌ی گفتگو خوانده می‌شوند.</p>
         <textarea id="msgs" style="min-height:160px"></textarea>
         <div class="row">
+          <label for="messagesFile" class="file-input">افزودن از فایل <input id="messagesFile" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json"></label>
           <button id="run" class="go">پیدا کردن مشتری‌ها</button>
           <button id="sample">پیام‌های نمونه</button>
         </div>
+        <p class="upload-note">فرمت‌های قابل پذیرش: TXT، CSV و JSON. حداکثر ۵۰ پیام؛ هر پیام یک خط یا یک ردیف.</p>
         <div class="err" id="err"></div>
       </section>
       <section>
@@ -140,6 +142,33 @@ $('#authForm').onsubmit = async e => {
 };
 $('#out').onclick = async () => { await api('/api/logout', 'POST').catch(() => {}); console.error("LOGIN_BOOT_ERR:", err); };
 $('#sample').onclick = async () => { const s = await api('/api/sample'); $('#product').value = s.product; $('#msgs').value = s.messages.join('\n'); };
+$('#messagesFile').onchange = async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const raw = (await file.text()).replace(/^\uFEFF/, '');
+    let messages;
+    if (file.name.toLowerCase().endsWith('.json')) {
+      const parsed = JSON.parse(raw);
+      const items = Array.isArray(parsed) ? parsed : (parsed.messages || parsed.data || []);
+      if (!Array.isArray(items)) throw new Error('فایل JSON باید آرایه پیام‌ها یا کلید messages داشته باشد.');
+      messages = items.map(item => typeof item === 'string' ? item : (item.text || item.message || '')).filter(Boolean);
+    } else if (file.name.toLowerCase().endsWith('.csv')) {
+      messages = raw.split(/\r?\n/).map(line => line.split(',')[0].replace(/^"|"$/g, '').trim()).filter(Boolean);
+      if (/^(text|message|پیام)$/i.test(messages[0] || '')) messages.shift();
+    } else {
+      messages = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    }
+    if (!messages.length) throw new Error('پیام قابل پردازشی در فایل یافت نشد.');
+    const existing = $('#msgs').value.trim();
+    $('#msgs').value = [existing, ...messages].filter(Boolean).join('\n');
+    say('#err', `${fa(messages.length)} پیام از فایل اضافه شد.`);
+  } catch (err) {
+    say('#err', err.message || 'خواندن فایل ممکن نشد.');
+  } finally {
+    e.target.value = '';
+  }
+};
 $('#all').onchange = renderList;
 const clearHelp = $('#clearHelp');
 if (clearHelp) {
@@ -197,7 +226,7 @@ function renderList() {
   if (!rows.length) { $('#list').innerHTML = `<div class="empty">${results.length ? 'مشتری مناسبی پیدا نشد.' : 'هنوز پیامی بررسی نشده. محصول را بنویس، پیام‌ها را بگذار و «پیدا کردن مشتری‌ها» را بزن.'}</div>`; return; }
   $('#list').innerHTML = rows.map(r => {
     const tag = r.is_lead ? 'مشتری مناسب' : r.stage === 'error' ? 'خطا' : r.stage === 'fit' ? 'تناسب کافی نبود' : 'در غربال رد شد';
-    const fb = r.is_lead ? `<button data-id="${r.id}" data-g="1" class="${r.feedback === 1 ? 'on' : ''}">درست بود</button><button data-id="${r.id}" data-g="0" class="${r.feedback === 0 ? 'on' : ''}">نادرست بود</button>` : '';
+    const fb = r.is_lead ? `<button data-id="${r.id}" data-g="1" class="feedback good ${r.feedback === 1 ? 'on' : ''}">درست بود</button><button data-id="${r.id}" data-g="0" class="feedback bad ${r.feedback === 0 ? 'on' : ''}">نادرست بود</button>` : '';
     return `<div class="item ${r.is_lead ? 'lead' : ''}">
       ${r.sender_name || r.sender_username || r.sender_id ? `<div class="sender"><div><div class="sender-name">${esc(r.sender_name || 'کاربر تلگرام')}</div>${r.sender_username ? `<div class="sender-handle">@${esc(r.sender_username.replace(/^@/, ''))}</div>` : r.sender_id ? `<div class="why">شناسه: ${esc(r.sender_id)}</div>` : ''}</div>${r.sender_username ? `<a class="btn telegram" target="_blank" rel="noopener noreferrer" href="https://t.me/${encodeURIComponent(r.sender_username.replace(/^@/, ''))}">پیام در تلگرام 💬</a>` : r.sender_id ? `<a class="btn telegram" target="_blank" rel="noopener noreferrer" href="tg://user?id=${encodeURIComponent(r.sender_id)}">پیام در تلگرام 💬</a>` : ''}</div>` : ''}
       <div class="msg">${esc(r.text)}</div>
@@ -234,8 +263,15 @@ $('#list').onclick = async e => {
       return;
     }
     if (b.dataset.id) {
-      await api(`/api/results/${b.dataset.id}/feedback`, 'POST', {good: b.dataset.g === '1'});
-      await refresh();
+      const good = b.dataset.g === '1';
+      await api(`/api/results/${b.dataset.id}/feedback`, 'POST', {good});
+      const item = results.find(x => String(x.id) === b.dataset.id);
+      if (item) item.feedback = good ? 1 : 0;
+      const sibling = b.parentElement.querySelector(`button[data-id="${b.dataset.id}"][data-g="${good ? '0' : '1'}"]`);
+      b.classList.add('on');
+      if (sibling) sibling.classList.remove('on');
+      const stats = await api('/api/stats');
+      renderStats(stats);
     }
   } catch (err) {
     say('#err', err.message || 'انجام عملیات ممکن نشد.');
@@ -256,10 +292,12 @@ function renderStats(s) {
     ["رد نشده در غربال", Math.max(0, n - t - er), ""],
     ["مشتری مناسب", leads, "g"]
   ];
-  const total_cost = s.total_cost || 0;
-  const cost_deep = s.cost_if_all_deep || 0;
+  const rate = s.usd_to_toman || 0;
+  const total_cost = (s.total_cost || 0) * rate;
+  const cost_deep = (s.cost_if_all_deep || 0) * rate;
   const save = cost_deep > 0 ? Math.max(0, 1 - total_cost / cost_deep) : 0;
-  const avg_cost = s.avg_cost_per_message || 0;
+  const avg_cost = (s.avg_cost_per_message || 0) * rate;
+  const toman = value => fa(Math.round(value)) + ' تومان';
   const rated = s.rated_leads || 0;
 
   const statsEl = document.getElementById("stats");
@@ -268,17 +306,18 @@ function renderStats(s) {
   statsEl.innerHTML = `<h2>هزینه و کیفیت</h2>
     <p class="hint">هر پیام از چند مرحله می‌گذرد؛ مرحله‌های گران فقط برای پیام‌های مرتبط اجرا می‌شود.</p>` +
     rows.map(([l, v, c]) => `<div class="fn"><div class="l"><span>${l}</span><b>${fa(v)}</b></div><div class="bar"><i class="${c}" style="width:${n ? (v / n * 100) : 0}%"></i></div></div>`).join("") +
-    `<div class="kv"><span>هزینه‌ی کل</span><b>${fa(total_cost, 4)}</b></div>
-     <div class="kv"><span>هر پیام (میانگین)</span><b>${fa(avg_cost, 5)}</b></div>
-     <div class="kv"><span>اگر همه عمیق بررسی می‌شد (تخمین)</span><b>${fa(cost_deep, 4)}</b></div>
+    `<div class="kv"><span>هزینه‌ی کل</span><b>${toman(total_cost)}</b></div>
+     <div class="kv"><span>هر پیام (میانگین)</span><b>${toman(avg_cost)}</b></div>
+     <div class="kv"><span>اگر همه عمیق بررسی می‌شد (تخمین)</span><b>${toman(cost_deep)}</b></div>
      <div class="kv"><span>صرفه‌جویی</span><b>${fa(save * 100)}٪</b></div>
      <div class="kv"><span>دقت فرصت‌ها</span><b>${s.precision == null ? "—" : fa(s.precision * 100) + "٪"}</b></div>
      <p class="hint" style="margin-top:8px">دقت از روی «درست بود/نادرست بود» شما حساب می‌شود (${fa(rated)} مورد). واحد هزینه: واحد اعتبار.</p>`;
 }
 
 async function refresh() {
-  const [r, s] = await Promise.all([api('/api/results'), api('/api/stats')]);
+  const [r, s, wallet] = await Promise.all([api('/api/results'), api('/api/stats'), api('/api/wallet')]);
   results = r; renderList(); renderStats(s);
+  $('#credit').textContent = `${fa(wallet.balance.message_credit)} اعتبار پیام`;
 }
 async function boot() {
   try {

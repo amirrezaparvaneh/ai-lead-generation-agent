@@ -201,6 +201,7 @@ dialog .btn{width:100%;padding:13px}
     <div id="nameFields" hidden><label for="firstName">نام</label><input class="in" id="firstName" autocomplete="given-name"><label for="lastName">نام خانوادگی</label><input class="in" id="lastName" autocomplete="family-name"></div>
     <label for="email">ایمیل</label><input class="in" id="email" type="email" autocomplete="email" placeholder="you@example.com">
     <label for="password">رمز عبور</label><input class="in" id="password" type="password" minlength="6" autocomplete="current-password" placeholder="حداقل ۶ کاراکتر">
+    <label style="display:flex;align-items:center;gap:8px;margin:12px 0 0;color:var(--mute);cursor:pointer"><input id="remember" type="checkbox" style="width:auto;margin:0"> من را فراموش نکن</label>
     <button class="btn p" id="emailSubmit">ورود</button>
   </div>
   <p class="note" style="text-align:center;margin:15px 0 0">ورود یا ثبت‌نام با <button id="mobileToggle" style="border:0;background:none;color:var(--blue);cursor:pointer;font:inherit">شماره تلفن</button></p>
@@ -234,7 +235,7 @@ function setEmailMode(isRegister) { registering = isRegister; $('#nameFields').h
 $('#mobileToggle').onclick = () => { const mobile = $('#mobileAuth'); mobile.hidden = !mobile.hidden; $('#emailAuth').hidden = !mobile.hidden; $('#mobileToggle').textContent = mobile.hidden ? 'شماره تلفن' : 'ایمیل'; };
 async function emailAuth() {
   const email = $('#email').value.trim(), password = $('#password').value;
-  const body = { email, password };
+  const body = { email, password, remember: $('#remember').checked };
   if (registering) { body.first_name = $('#firstName').value.trim(); body.last_name = $('#lastName').value.trim(); if (!body.first_name || !body.last_name) return err('نام و نام خانوادگی را وارد کنید.'); }
   err(''); busy($('#emailSubmit'), true);
   try { await post(registering ? '/api/register' : '/api/login', body); location.href = '/app.html'; }

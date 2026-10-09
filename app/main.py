@@ -4,6 +4,8 @@ import pathlib
 import re
 import secrets
 import sqlite3
+import time
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Union
 
@@ -17,7 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 import threading
-from . import auth, db
+from . import auth, config, db
 from .agent import evaluate
 
 from .sms import generate_otp, verify_otp_code, send_sms_melipayamak
@@ -33,6 +35,23 @@ db.init()
 # پیشرفت لحظه‌ای تحلیل، به ازای هر کاربر (فقط برای یک پردازه؛ با --workers=1 اجرا شود)
 PROGRESS = {}
 PROGRESS_LOCK = threading.Lock()
+EXCHANGE_RATE = {"rial": config.USD_TO_RIAL_FALLBACK, "updated_at": 0, "source": "پیش‌فرض"}
+EXCHANGE_RATE_LOCK = threading.Lock()
+
+
+def usd_to_rial_rate():
+    with EXCHANGE_RATE_LOCK:
+        if time.time() - EXCHANGE_RATE["updated_at"] < config.EXCHANGE_RATE_REFRESH_SECONDS:
+            return EXCHANGE_RATE.copy()
+        try:
+            # نرخ USD/IRR از API عمومی؛ در صورت قطعی API مقدار تنظیم‌شده حفظ می‌شود.
+            with urllib.request.urlopen("https://open.er-api.com/v6/latest/USD", timeout=5) as response:
+                rate = float(json.load(response)["rates"]["IRR"])
+            if rate > 0:
+                EXCHANGE_RATE.update({"rial": rate, "updated_at": time.time(), "source": "open.er-api.com"})
+        except Exception:
+            EXCHANGE_RATE["updated_at"] = time.time()
+        return EXCHANGE_RATE.copy()
 
 # تنظیمات Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -43,6 +62,7 @@ app.add_middleware(SlowAPIMiddleware)
 class Credentials(BaseModel):
     email: str
     password: str = Field(min_length=6)
+    remember: bool = False
 
 
 class RegistrationIn(Credentials):
@@ -93,13 +113,17 @@ class CreditUserIn(BaseModel):
     note: str = Field(default="", max_length=1000)
 
 
+class SubscriptionIn(BaseModel):
+    plan: str
+
+
 def require_admin(admin_session: Optional[str] = Cookie(default=None)):
     if not admin_session or not db.admin_session(admin_session):
         raise HTTPException(401, "admin login required")
 
-def _login(response: Response, user_id: int):
+def _login(response: Response, user_id: int, remember: bool = False):
     token = auth.new_session(user_id)
-    response.set_cookie("session", token, httponly=True, samesite="lax", max_age=7 * 86400)
+    response.set_cookie("session", token, httponly=True, samesite="lax", max_age=(30 if remember else 7) * 86400)
 
 @app.post("/api/register")
 @limiter.limit("5/minute")
@@ -114,7 +138,7 @@ def register(request: Request, body: RegistrationIn, response: Response):
         )
     except sqlite3.IntegrityError:
         raise HTTPException(409, "email already registered")
-    _login(response, user_id)
+    _login(response, user_id, body.remember)
     return {"email": email, "first_name": body.first_name.strip(), "last_name": body.last_name.strip()}
 
 @app.post("/api/login")
@@ -123,7 +147,7 @@ def login(request: Request, body: Credentials, response: Response):
     rows = db.query("SELECT id, pw FROM users WHERE email=?", (body.email.strip().lower(),))
     if not rows or not auth.check_password(body.password, rows[0]["pw"]):
         raise HTTPException(401, "wrong email or password")
-    _login(response, rows[0]["id"])
+    _login(response, rows[0]["id"], body.remember)
     user = db.query("SELECT first_name, last_name FROM users WHERE id=?", (rows[0]["id"],))[0]
     return {"email": body.email.strip().lower(), "first_name": user["first_name"], "last_name": user["last_name"]}
 
@@ -228,14 +252,10 @@ def process(request: Request, body: AnalyzeIn, background_tasks: BackgroundTasks
     if not product:
         raise HTTPException(400, "set your product first")
     
-    usage_res = db.query("SELECT COUNT(id) as c FROM results WHERE user_id=?", (user["id"],))
-    current_usage = usage_res[0]["c"] if usage_res else 0
-    
     wallet = db.wallet(user["id"])
-    free_capacity = max(0, MAX_QUOTA - current_usage)
-    allowed_capacity = free_capacity + wallet["message_credit"]
+    allowed_capacity = wallet["message_credit"]
     if not allowed_capacity:
-        raise HTTPException(402, "سقف مجاز شما به پایان رسیده است. با گزارش باگ یا پیشنهاد مؤثر، اعتبار پیام دریافت کنید.")
+        raise HTTPException(402, "اعتبار پیام شما به پایان رسیده است. اشتراک تهیه کنید یا با گزارش باگ و پیشنهاد مؤثر اعتبار دریافت کنید.")
 
     messages = []
     for item in body.messages:
@@ -248,8 +268,9 @@ def process(request: Request, body: AnalyzeIn, background_tasks: BackgroundTasks
     if not messages:
         raise HTTPException(400, "no messages")
 
-    examples = db.feedback_examples(user["id"])
     total = len(messages)
+    db.consume_message_credit(user["id"], total)
+    examples = db.feedback_examples(user["id"])
     with PROGRESS_LOCK:
         PROGRESS[user["id"]] = {"done": 0, "total": total}
 
@@ -302,7 +323,25 @@ def feedback(result_id: int, body: FeedbackIn, user=Depends(auth.current_user)):
 
 @app.get("/api/stats")
 def stats(user=Depends(auth.current_user)):
-    return db.stats(user["id"])
+    data = db.stats(user["id"])
+    rate = usd_to_rial_rate()
+    data["usd_to_rial"] = rate["rial"]
+    data["usd_to_toman"] = rate["rial"] / 10
+    data["exchange_rate_source"] = rate["source"]
+    return data
+
+
+@app.post("/api/subscriptions/purchase")
+@limiter.limit("5/minute")
+def purchase_subscription(request: Request, body: SubscriptionIn, user=Depends(auth.current_user)):
+    plans = {"professional_monthly": {"name": "حرفه‌ای ماهانه", "message_credit": 2000, "amount": 490_000}}
+    plan = plans.get(body.plan)
+    if not plan:
+        raise HTTPException(400, "invalid subscription plan")
+    # اتصال درگاه در این نقطه جایگزین می‌شود. شبیه‌سازی پرداخت برای نسخه داوری است.
+    time.sleep(2)
+    db.purchase_subscription(user["id"], plan["name"], plan["message_credit"], plan["amount"])
+    return {"ok": True, "plan": body.plan, "message_credit": plan["message_credit"]}
 
 
 @app.get("/api/wallet")
