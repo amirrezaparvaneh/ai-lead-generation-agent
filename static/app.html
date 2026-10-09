@@ -87,7 +87,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
       <section>
         <div class="row" style="justify-content:space-between;margin:0">
           <h2>نتیجه‌ها</h2>
-          <label><input type="checkbox" id="all" style="width:auto"> نمایش پیام‌های ردشده</label>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <label><input type="checkbox" id="all" style="width:auto"> نمایش پیام‌های ردشده</label>
+            <button id="clearBtn" type="button" style="background:#fee2e2;color:#991b1b;border:1px solid #f87171;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit;">🗑️ پاکسازی نتایج</button>
+          </div>
         </div>
         <div id="list"></div>
       </section>
@@ -109,7 +112,7 @@ async function api(path, method = 'GET', body) {
   if (!r.ok) {
     if (r.status === 401 && !path.match(/login|register/)) show(false);
     const e = await r.json().catch(() => ({}));
-    throw new Error(typeof e.detail === 'string' ? e.detail : 'ورودی نامعتبر است');
+    const msg = typeof e.detail === 'string' ? e.detail : (Array.isArray(e.detail) ? e.detail.map(d => d.loc.join(".") + ": " + d.msg).join(" | ") : JSON.stringify(e.detail || 'ورودی نامعتبر است')); throw new Error(msg);
   }
   return r.json();
 }
@@ -131,9 +134,21 @@ $('#authForm').onsubmit = async e => {
   try { await api('/api/' + mode, 'POST', {email: $('#email').value, password: $('#pw').value}); say('#authErr'); await boot(); }
   catch (x) { say('#authErr', x.message === 'wrong email or password' ? 'ایمیل یا رمز اشتباه است' : x.message === 'email already registered' ? 'این ایمیل قبلاً ثبت شده' : x.message); }
 };
-$('#out').onclick = async () => { await api('/api/logout', 'POST').catch(() => {}); location.href = '/'; };
+$('#out').onclick = async () => { await api('/api/logout', 'POST').catch(() => {}); console.error("LOGIN_BOOT_ERR:", err); };
 $('#sample').onclick = async () => { const s = await api('/api/sample'); $('#product').value = s.product; $('#msgs').value = s.messages.join('\n'); };
 $('#all').onchange = renderList;
+const clearBtn = $('#clearBtn');
+if (clearBtn) {
+  clearBtn.onclick = async () => {
+    if (!confirm("آیا از پاکسازی تمام نتایج و ریست آمار اطمینان دارید؟")) return;
+    try {
+      await api("/api/results", "DELETE");
+      await refresh();
+    } catch (err) {
+      alert("خطا در پاکسازی: " + err.message);
+    }
+  };
+}
 
 $('#run').onclick = async () => {
   const msgs = $('#msgs').value.split('\n').map(s => s.trim()).filter(Boolean);
@@ -141,17 +156,32 @@ $('#run').onclick = async () => {
   say('#err'); $('#run').disabled = true; $('#run').textContent = 'در حال بررسی…';
   try {
     await api('/api/product', 'PUT', {text: $('#product').value});
-    await api('/api/analyze', 'POST', {messages: msgs});
-    await refresh();
+    await api('/api/process', 'POST', {messages: msgs});
+    const waitForResults = async () => {
+      const p = await api('/api/progress');
+      await refresh();
+      const total = p.total || msgs.length;
+      $('#run').textContent = `در حال بررسی ${fa(p.done || 0)} از ${fa(total)}…`;
+      if (!p.finished && (p.done || 0) < total) {
+        setTimeout(() => waitForResults().catch(x => say('#err', x.message)), 1200);
+        return;
+      }
+      $('#run').disabled = false;
+      $('#run').textContent = 'پیدا کردن مشتری‌ها';
+    };
+    await waitForResults();
+    return;
   } catch (x) { say('#err', x.message); }
   $('#run').disabled = false; $('#run').textContent = 'پیدا کردن مشتری‌ها';
 };
 
 function safeUrl(value) {
-  try { const u = new URL(value, location.origin); return ['http:', 'https:', 'tg:'].includes(u.protocol) ? u.href : '#'; } catch { return '#'; }
+  try { const u = new URL(value, location.origin); return ['http:', 'https:', 'tg:'].includes(u.protocol) ? u.href : '#'; } catch (err) {
+    console.error("LOGIN_BOOT_ERR:", err); return '#'; }
 }
 function renderList() {
-
+  const showAll = $("#all") && $("#all").checked;
+  const rows = showAll ? results.filter(r => !r.is_lead) : results.filter(r => r.is_lead);
   if (!rows.length) { $('#list').innerHTML = `<div class="empty">${results.length ? 'مشتری مناسبی پیدا نشد.' : 'هنوز پیامی بررسی نشده. محصول را بنویس، پیام‌ها را بگذار و «پیدا کردن مشتری‌ها» را بزن.'}</div>`; return; }
   $('#list').innerHTML = rows.map(r => {
     const tag = r.is_lead ? 'مشتری مناسب' : r.stage === 'error' ? 'خطا' : r.stage === 'fit' ? 'تناسب کافی نبود' : 'در غربال رد شد';
@@ -172,17 +202,35 @@ $('#list').onclick = async e => {
 };
 
 function renderStats(s) {
-  const n = s.messages, t = s.by_stage.triage || 0, er = s.by_stage.error || 0;
-  const rows = [['همه‌ی پیام‌ها', n, ''], ['رد نشده در غربال', n - t - er, ''], ['مشتری مناسب', s.leads, 'g']];
-  const save = s.cost_if_all_deep > 0 ? Math.max(0, 1 - s.total_cost / s.cost_if_all_deep) : 0;
-  $('#stats').innerHTML = `<h2>هزینه و کیفیت</h2><p class="hint">هر پیام از چند مرحله می‌گذرد؛ مرحله‌های گران فقط برای پیام‌های مرتبط اجرا می‌شود.</p>` +
-    rows.map(([l, v, c]) => `<div class="fn"><div class="l"><span>${l}</span><b>${fa(v)}</b></div><div class="bar"><i class="${c}" style="width:${n ? v / n * 100 : 0}%"></i></div></div>`).join('') +
-    `<div class="kv"><span>هزینه‌ی کل</span><b>${fa(s.total_cost, 4)}</b></div>
-     <div class="kv"><span>هر پیام (میانگین)</span><b>${fa(s.avg_cost_per_message, 5)}</b></div>
-     <div class="kv"><span>اگر همه عمیق بررسی می‌شد (تخمین)</span><b>${fa(s.cost_if_all_deep, 4)}</b></div>
+  s = s || {};
+  const by_stage = s.by_stage || {};
+  const n = s.messages || 0;
+  const t = by_stage.triage || 0;
+  const er = by_stage.error || 0;
+  const leads = s.leads || 0;
+  const rows = [
+    ["همه‌ی پیام‌ها", n, ""],
+    ["رد نشده در غربال", Math.max(0, n - t - er), ""],
+    ["مشتری مناسب", leads, "g"]
+  ];
+  const total_cost = s.total_cost || 0;
+  const cost_deep = s.cost_if_all_deep || 0;
+  const save = cost_deep > 0 ? Math.max(0, 1 - total_cost / cost_deep) : 0;
+  const avg_cost = s.avg_cost_per_message || 0;
+  const rated = s.rated_leads || 0;
+
+  const statsEl = document.getElementById("stats");
+  if (!statsEl) return;
+
+  statsEl.innerHTML = `<h2>هزینه و کیفیت</h2>
+    <p class="hint">هر پیام از چند مرحله می‌گذرد؛ مرحله‌های گران فقط برای پیام‌های مرتبط اجرا می‌شود.</p>` +
+    rows.map(([l, v, c]) => `<div class="fn"><div class="l"><span>${l}</span><b>${fa(v)}</b></div><div class="bar"><i class="${c}" style="width:${n ? (v / n * 100) : 0}%"></i></div></div>`).join("") +
+    `<div class="kv"><span>هزینه‌ی کل</span><b>${fa(total_cost, 4)}</b></div>
+     <div class="kv"><span>هر پیام (میانگین)</span><b>${fa(avg_cost, 5)}</b></div>
+     <div class="kv"><span>اگر همه عمیق بررسی می‌شد (تخمین)</span><b>${fa(cost_deep, 4)}</b></div>
      <div class="kv"><span>صرفه‌جویی</span><b>${fa(save * 100)}٪</b></div>
-     <div class="kv"><span>دقت فرصت‌ها</span><b>${s.precision == null ? '—' : fa(s.precision * 100) + '٪'}</b></div>
-     <p class="hint" style="margin-top:8px">دقت از روی «درست بود/نادرست بود» شما حساب می‌شود (${fa(s.rated_leads)} مورد). واحد هزینه: واحد اعتبار.</p>`;
+     <div class="kv"><span>دقت فرصت‌ها</span><b>${s.precision == null ? "—" : fa(s.precision * 100) + "٪"}</b></div>
+     <p class="hint" style="margin-top:8px">دقت از روی «درست بود/نادرست بود» شما حساب می‌شود (${fa(rated)} مورد). واحد هزینه: واحد اعتبار.</p>`;
 }
 
 async function refresh() {
@@ -197,8 +245,9 @@ async function boot() {
     $('#who').textContent = fullName ? `${fullName} (${me.email || me.phone || ''})` : (me.email || me.phone || 'کاربر نشانه');
     if (me.product) $('#product').value = me.product;
     await refresh();
-  } catch {
-    location.href = '/';
+  } catch (err) {
+    console.error("LOGIN_BOOT_ERR:", err);
+    show(false);
   }
 }
 boot();

@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+from pathlib import Path
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 import os
 import time
 import httpx
@@ -8,8 +11,9 @@ class LLMError(Exception):
     pass
 
 # کلید API خودت را اینجا وارد کن
-API_KEY = os.getenv("AVALAI_API_KEY", "کلید_ای_پی_آی_شما")  
-BASE_URL = "https://api.avalai.ir/v1/chat/completions"
+API_KEY = os.getenv("LLM_API_KEY") or os.getenv("AVALAI_API_KEY")
+base = os.getenv("LLM_BASE_URL", "https://api.avalai.ir/v1").rstrip("/")
+BASE_URL = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
 
 client = httpx.Client(timeout=60.0)
 
@@ -64,7 +68,12 @@ def chat_json(model: str, price: float, system: str, user: str) -> Tuple[Dict[st
     prompt_tokens = usage.get("prompt_tokens", 0)
     completion_tokens = usage.get("completion_tokens", 0)
     
-    cost = ((prompt_tokens + completion_tokens) / 1000) * price
+    if isinstance(price, (tuple, list)) and len(price) >= 2:
+        cost = (prompt_tokens * price[0] + completion_tokens * price[1]) / 1_000_000
+    elif isinstance(price, (int, float)):
+        cost = ((prompt_tokens + completion_tokens) / 1_000_000) * price
+    else:
+        cost = 0.0
     
     import json
     content = data["choices"][0]["message"]["content"]
@@ -73,4 +82,10 @@ def chat_json(model: str, price: float, system: str, user: str) -> Tuple[Dict[st
     except json.JSONDecodeError:
         parsed_content = {"error": "Invalid JSON response", "raw": content}
         
-    return parsed_content, cost
+    usage_info = {
+        "tokens": prompt_tokens + completion_tokens,
+        "cost": cost,
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens
+    }
+    return parsed_content, usage_info

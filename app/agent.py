@@ -152,8 +152,9 @@ def build():
     g.add_conditional_edges("triage", _after_triage)
     g.add_edge("analyze", "fit")
     g.add_conditional_edges("fit", _after_fit)
-    g.add_edge("draft", "review")
-    g.add_conditional_edges("review", _after_review)
+    # بازبینی خودکار یک فراخوانی مدل اضافه و در موارد ردشده، بازنویسی تکراری ایجاد می‌کرد.
+    # پاسخ پیش‌نویس مستقیماً پس از ارزیابی تناسب تحویل می‌شود.
+    g.add_edge("draft", END)
     return g.compile()
 
 graph = build()

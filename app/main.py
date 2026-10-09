@@ -254,18 +254,19 @@ def process(request: Request, body: AnalyzeIn, background_tasks: BackgroundTasks
         PROGRESS[user["id"]] = {"done": 0, "total": total}
 
     def process_bg(u_id, p_text, msgs, src, ex_list):
-        def work(i):
-            ctx = [m["text"] for m in msgs[max(0, i - CONTEXT_WINDOW):i]]
-            return evaluate(p_text, msgs[i]["text"], ctx, src, ex_list)
         try:
-            from concurrent.futures import ThreadPoolExecutor
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                states = list(pool.map(work, range(len(msgs))))
-            for m, s in zip(msgs, states):
-                _store(u_id, m, s)
+            for i, message in enumerate(msgs):
+                ctx = [m["text"] for m in msgs[max(0, i - CONTEXT_WINDOW):i]]
+                state = evaluate(p_text, message["text"], ctx, src, ex_list)
+                _store(u_id, message, state)
+                with PROGRESS_LOCK:
+                    if u_id in PROGRESS:
+                        PROGRESS[u_id]["done"] = i + 1
         finally:
+            # وضعیت نهایی برای polling باقی می‌ماند تا رابط کاربری آخرین نتیجه را دریافت کند.
             with PROGRESS_LOCK:
-                PROGRESS.pop(u_id, None)
+                if u_id in PROGRESS:
+                    PROGRESS[u_id]["finished"] = True
 
     background_tasks.add_task(process_bg, user["id"], product[0]["text"], messages, body.source, examples)
     return {"ok": True, "message": "در حال پردازش در پس‌زمینه..."}
@@ -274,7 +275,7 @@ def process(request: Request, body: AnalyzeIn, background_tasks: BackgroundTasks
 def progress(user=Depends(auth.current_user)):
     with PROGRESS_LOCK:
         p = PROGRESS.get(user["id"])
-    return p or {"done": 0, "total": 0}
+    return p or {"done": 0, "total": 0, "finished": True}
 
 @app.get("/api/results")
 def results(only_leads: bool = False, user=Depends(auth.current_user)):
