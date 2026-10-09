@@ -1,285 +1,230 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لیدفایندر | سامانه هوشمند جذب و ارکستراسیون سرنخ</title>
-    <!-- Bootstrap 5.3.3 RTL CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css">
-    <!-- Vazirmatn Font -->
-    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
-    
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <style>
-        *, *::before, *::after {
-            font-family: 'Vazirmatn', sans-serif !important;
-        }
-        body {
-            background-color: #030712;
-            color: #f3f4f6;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-        h1, h2, h3, h4, h5, h6 {
-            font-family: 'Vazirmatn', sans-serif;
-            font-weight: 800;
-        }
-        .glass-card {
-            background: rgba(17, 24, 39, 0.75);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 1rem;
-        }
-        .btn-cyan {
-            background-color: #06b6d4;
-            color: #030712;
-            font-weight: 700;
-            border: none;
-        }
-        .btn-cyan:hover {
-            background-color: #22d3ee;
-        }
-        .glow-bg {
-            position: absolute;
-            width: 600px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, rgba(3, 7, 18, 0) 70%);
-            z-index: -1;
-        }
-        input, button, .form-control, .btn {
-            font-family: 'Vazirmatn', sans-serif !important;
-        }
-        input::placeholder {
-            font-family: 'Vazirmatn', sans-serif !important;
-            direction: rtl;
-            text-align: center;
-            letter-spacing: 0;
-        }
-        .phone-field-label {
-            display: block;
-            text-align: right;
-            line-height: 1.8;
-        }
-
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>کاشف | پیدا کردن مشتری واقعی در میان پیام‌های گروه</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%231F3FD8'/%3E%3Cpath d='M8 10h16M11 16h10M14 22h4' stroke='%23F4B223' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+<style>
+:root{--bg:#F6F8FC;--card:#fff;--ink:#12203A;--mute:#5B6B86;--line:#DCE3F0;--blue:#1F3FD8;--tint:#E8EDFF;--gold:#F4B223;--goldt:#FFF3D6}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 16px/1.9 Vazirmatn,Tahoma,sans-serif}
+input,button{font:inherit}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:3px solid var(--blue);outline-offset:3px;border-radius:8px}
+.wrap{max-width:1120px;margin:0 auto;padding:0 22px}
+nav{display:flex;justify-content:space-between;align-items:center;padding:20px 0}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:21px}
+.links{display:flex;gap:26px;color:var(--mute);font-size:15px}
+.links a:hover{color:var(--blue)}
+.btn{display:inline-flex;align-items:center;justify-content:center;border:0;cursor:pointer;border-radius:12px;padding:10px 22px;font-weight:600;transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-2px)}
+.btn.p{background:var(--blue);color:#fff;box-shadow:0 10px 24px -10px rgba(31,63,216,.65)}
+.btn.o{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.55;cursor:wait;transform:none}
+.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;padding:54px 0 80px}
+.eyebrow{display:inline-block;background:var(--tint);color:var(--blue);font-size:13px;font-weight:600;padding:2px 14px;border-radius:99px;margin-bottom:18px}
+h1{font-size:clamp(30px,4.6vw,51px);font-weight:800;line-height:1.55;margin-bottom:18px}
+mark{background:linear-gradient(transparent 60%,#F8D98A 60%);color:inherit;padding:0 4px}
+.lead{color:var(--mute);font-size:17.5px;max-width:30em;margin-bottom:28px}
+.cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.cta .btn{padding:13px 28px;font-size:16.5px}
+.note{margin-top:14px;font-size:13px;color:var(--mute)}
+.feed{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 24px 50px -28px rgba(18,32,58,.35);transform:rotate(-1.2deg)}
+.fh{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mute);padding:2px 4px 12px;border-bottom:1px dashed var(--line)}
+.fh b{color:var(--ink);font-size:14px}
+.sample{background:var(--goldt);color:#8A5A00;border-radius:99px;padding:0 10px;font-size:12px}
+.m{padding:12px 6px;border-bottom:1px solid #EEF1F8;font-size:14.5px}
+.m .t{display:block;margin-bottom:6px}
+.chip{display:inline-block;font-size:12px;padding:0 10px;border-radius:99px;background:#EEF1F8;color:var(--mute)}
+.m.off{opacity:.5}
+.m.hit{background:var(--goldt);border-radius:12px;border-bottom-color:transparent;margin:6px 0}
+.m.hit .chip{background:var(--gold);color:#3B2800;font-weight:700}
+.re{margin-top:8px;background:#fff;border-radius:10px;padding:8px 12px;font-size:13.5px;color:var(--mute);border:1px solid #F3DFAE}
+.ff{padding:12px 4px 2px;font-size:13px;color:var(--mute);display:flex;justify-content:space-between}
+section{padding:70px 0}
+h2{font-size:clamp(24px,3.2vw,34px);font-weight:800;line-height:1.6;margin-bottom:8px}
+.sub{color:var(--mute);max-width:38em;margin-bottom:34px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.st{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;transition:transform .2s,box-shadow .2s}
+.st:hover{transform:translateY(-4px);box-shadow:0 18px 34px -22px rgba(18,32,58,.4)}
+.st i{font-style:normal;display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:var(--tint);color:var(--blue);font-weight:800;margin-bottom:12px}
+.st:last-child i{background:var(--gold);color:#3B2800}
+.st h3{font-size:17px;margin-bottom:4px}
+.st p{color:var(--mute);font-size:14.5px;line-height:1.9}
+.nums{background:var(--ink);color:#fff;border-radius:26px;padding:46px;display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.nums b{display:block;font-size:42px;font-weight:800;color:var(--gold);line-height:1.4}
+.nums span{color:#C7D1E6;font-size:15px}
+.fine{margin-top:16px;font-size:13px;color:var(--mute)}
+.band{background:var(--tint);border-radius:26px;padding:44px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+footer{padding:34px 0 40px;color:var(--mute);font-size:13.5px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+dialog{border:0;border-radius:22px;padding:28px;width:min(92vw,410px);color:var(--ink);box-shadow:0 40px 80px -30px rgba(18,32,58,.55);margin:auto}
+dialog::backdrop{background:rgba(18,32,58,.4)}
+.dh{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.dh h3{font-size:19px}
+.x{background:none;border:0;font-size:24px;cursor:pointer;color:var(--mute);line-height:1}
+label{display:block;font-size:14px;color:var(--mute);margin-bottom:6px}
+.in{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px;font-size:20px;text-align:center;letter-spacing:2px;margin-bottom:12px;background:#fff;color:var(--ink)}
+.in:focus{border-color:var(--blue);outline:none}
+.row{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--mute);margin-bottom:12px}
+.row button{background:none;border:0;color:var(--blue);cursor:pointer;padding:0}
+.row button:disabled{color:var(--mute);cursor:default}
+.err{color:#B3261E;font-size:13.5px;min-height:24px}
+dialog .btn{width:100%;padding:13px}
+[hidden]{display:none!important}
+@media(max-width:860px){.hero{grid-template-columns:1fr;padding-top:24px}.feed{transform:none}.steps{grid-template-columns:1fr 1fr}.nums{grid-template-columns:1fr;padding:30px}.links{display:none}}
+@media(max-width:520px){.steps{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="#">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="10" fill="#1F3FD8"/><path d="M8 11h18M12 17h10" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M15 23h4" stroke="#F4B223" stroke-width="2.8" stroke-linecap="round"/></svg>
+      کاشف
+    </a>
+    <div class="links"><a href="#how">روش کار</a><a href="#nums">نتیجه‌ها</a></div>
+    <button class="btn o open">ورود / ثبت‌نام</button>
+  </nav>
 
-    <div id="app" class="d-flex flex-column min-vh-100 position-relative overflow-hidden">
-
-        <!-- Ambient Background Glows -->
-        <div class="glow-bg top-0 start-50 translate-middle-x"></div>
-
-        <!-- Navbar -->
-        <nav class="navbar navbar-dark container py-4">
-            <div class="container-fluid">
-                <a class="navbar-brand d-flex align-items-center gap-2 fw-black text-white fs-4" href="#">
-                    <div class="p-2 rounded-3 text-dark d-flex align-items-center justify-content-center shadow-lg" style="background: linear-gradient(135deg, #06b6d4, #3b82f6);">
-                        ⚡
-                    </div>
-                    <span class="fw-bold tracking-wide">لیدفایندر</span>
-                </a>
-                <button @click="openAuthModal" class="btn btn-outline-info rounded-pill px-4 fw-bold">
-                    ورود / ثبت‌نام
-                </button>
-            </div>
-        </nav>
-
-        <!-- Hero Section -->
-        <main class="container text-center my-auto py-5 flex-grow-1 d-flex flex-column justify-content-center align-items-center">
-            <div class="badge bg-dark border border-secondary text-info px-4 py-2 rounded-pill mb-4 shadow-sm fw-normal">
-                ✨ مجهز به سیستم چندعاملی هوش مصنوعی (Multi-Agent)
-            </div>
-            <h1 class="display-4 fw-black text-white mb-4 max-w-4xl lh-base">
-                تبدیل هوشمند پیام‌های شبکه‌های اجتماعی به <span class="text-info">فروش قطعی</span>
-            </h1>
-            <p class="text-secondary lead mb-5 max-w-2xl fs-5">
-                غربالگری خودکار هرزنامه‌ها، شناسایی قصد خرید مشتریان و تولید پاسخ‌های استراتژیک در کسری از ثانیه.
-            </p>
-            <button @click="openAuthModal" class="btn btn-cyan btn-lg px-5 py-3 rounded-4 shadow-lg fs-5">
-                شروع رایگان و ورود به سامانه
-            </button>
-        </main>
-
-        <!-- Footer -->
-        <footer class="text-center py-4 text-secondary border-top border-dark fs-7">
-            توسعه یافته با استانداردهای مدرن • توسعه‌یافته توسط امیررضا پروانه
-        </footer>
-
-        <!-- Authentication Modal (Vue 3 Reactive Modal) -->
-        <div class="modal fade" id="authModal" tabindex="-1" aria-hidden="true" ref="authModalRef">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content glass-card text-white p-4 border-secondary">
-                    <div class="modal-header border-0 pb-0">
-                        <h5 class="modal-title fw-bold fs-4">ورود به پلتفرم</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
-                    </div>
-                    <div class="modal-content-body modal-body pt-3">
-                        
-                        <!-- Step 1: Phone -->
-                        <div v-if="step === 1" class="text-right">
-                            <label class="form-label text-secondary small fw-semibold mb-2 phone-field-label">شماره موبایل (با ۰۹ شروع شود)</label>
-                            <input type="text" v-model="phone" @input="formatPhoneInput" placeholder="۰۹۱۲۳۴۵۶۷۸۹" 
-                                                                      class="form-control bg-dark border-secondary text-white text-center fs-5 py-3 rounded-3 mb-4"
-                                   dir="rtl" maxlength="11" />
-                            <button @click="sendOTP" :disabled="loading" class="btn btn-cyan w-100 py-3 rounded-3 shadow">
-                                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
-                                دریافت کد تایید
-                            </button>
-                        </div>
-
-                        <!-- Step 2: Verify Code -->
-                        <div v-if="step === 2" class="text-right">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label text-secondary small fw-semibold">کد تایید ۴ رقمی</label>
-                                <button @click="step = 1" class="btn btn-link text-info p-0 text-decoration-none small">ویرایش شماره</button>
-                            </div>
-                            <input type="text" v-model="code" @input="formatCodeInput" placeholder="----" maxlength="4"
-                                                                      class="form-control bg-dark border-secondary text-white text-center fs-4 tracking-widest py-3 rounded-3 mb-3" />
-                            
-                            <div class="d-flex justify-content-between align-items-center text-secondary small mb-4">
-                                <span class="font-monospace text-info">{{ timerText }}</span>
-                                <button @click="sendOTP" :disabled="timer > 0" class="btn btn-link text-secondary p-0 text-decoration-none small" :class="{'disabled': timer > 0}">ارسال مجدد</button>
-                            </div>
-
-                            <button @click="verifyOTP" :disabled="loading" class="btn btn-success w-100 py-3 rounded-3 shadow fw-bold">
-                                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
-                                تایید و ورود به داشبورد
-                            </button>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-        </div>
-
+  <header class="hero">
+    <div>
+      <span class="eyebrow">ایجنت پیدا کردن مشتری در گروه‌ها و جامعه‌های آنلاین</span>
+      <h1>در میان صدها پیام، <mark>مشتری واقعی</mark> را پیدا کن</h1>
+      <p class="lead">کاشف پیام‌های گروه شما را می‌خواند، زمینه‌ی گفتگو را می‌فهمد و فقط وقتی پاسخ پیشنهاد می‌دهد که محصولتان واقعاً به کار آن آدم بیاید. بقیه‌ی پیام‌ها با کمترین هزینه کنار می‌روند.</p>
+      <div class="cta">
+        <button class="btn p open">شروع با شماره‌ی موبایل</button>
+        <a class="btn o" href="#how">ببین چطور کار می‌کند</a>
+      </div>
+      <p class="note">ورود فقط با کد تأیید ۴ رقمی؛ بدون رمز عبور.</p>
     </div>
 
-    <!-- Bootstrap 5.3 JS Bundle -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Vue 3 CDN -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <div class="feed" aria-label="نمونه‌ی نمایشی خروجی">
+      <div class="fh"><b>گروه برنامه‌نویسی</b><span class="sample">نمونه‌ی نمایشی</span></div>
+      <div class="m hit">
+        <span class="t">من هیچ سابقه‌ای ندارم، از کجا پایتون رو شروع کنم؟</span>
+        <span class="chip">مشتری مناسب · امتیاز ۹۴</span>
+        <div class="re">پیشنهاد پاسخ: اگر از صفر شروع می‌کنی، اول یک مسیر هشت‌هفته‌ای پروژه‌محور بهتر از ویدیوهای پراکنده است…</div>
+      </div>
+      <div class="m off"><span class="t">توی asyncio مشکل race condition دارم</span><span class="chip">در غربال رد شد</span></div>
+      <div class="m off"><span class="t">امروز هوا چقدر خوبه!</span><span class="chip">در غربال رد شد</span></div>
+      <div class="m hit">
+        <span class="t">ترم سه کامپیوتر هستم و درس برنامه‌نویسی رو افتادم</span>
+        <span class="chip">مشتری مناسب · امتیاز ۸۷</span>
+      </div>
+      <div class="ff"><span>۲ مشتری از ۴ پیام</span><span>هزینه‌ی کل ≈ ۰٫۰۰۶ واحد</span></div>
+    </div>
+  </header>
 
-    <script>
-        const { createApp, ref, computed } = Vue;
+  <section id="how">
+    <h2>هر پیام از چهار دروازه می‌گذرد</h2>
+    <p class="sub">دروازه‌های ارزان اول می‌آیند. مدل قوی‌تر فقط برای پیام‌هایی صدا زده می‌شود که احتمال مشتری بودنشان هست.</p>
+    <div class="steps">
+      <div class="st"><i>۱</i><h3>غربال ارزان</h3><p>یک مدل کوچک پیام‌های بی‌ربط را همان‌جا کنار می‌گذارد.</p></div>
+      <div class="st"><i>۲</i><h3>فهم زمینه</h3><p>پیام‌های قبلی خوانده می‌شود تا سطح و قصد فرد روشن شود.</p></div>
+      <div class="st"><i>۳</i><h3>سنجش تناسب</h3><p>امتیاز ۰ تا ۱۰۰ همراه با دلیل؛ زیر آستانه یعنی توقف.</p></div>
+      <div class="st"><i>۴</i><h3>پیشنهاد پاسخ</h3><p>یک پاسخ کوتاه و غیرتبلیغاتی که اول به خود فرد کمک می‌کند.</p></div>
+    </div>
+  </section>
 
-        createApp({
-            setup() {
-                const step = ref(1);
-                const phone = ref('');
-                const code = ref('');
-                const loading = ref(false);
-                const timer = ref(120);
-                let timerInterval = null;
-                let modalInstance = null;
+  <section id="nums" style="padding-top:20px">
+    <div class="nums">
+      <div><b>۸ از ۸</b><span>پیام نمونه درست دسته‌بندی شد</span></div>
+      <div><b>≈ ۶۰ برابر</b><span>ارزان‌تر بودن رد کردن یک پیام بی‌ربط نسبت به بررسی کامل یک مشتری</span></div>
+      <div><b>≈ ۰٫۰۰۳</b><span>واحد اعتبار برای بررسی کامل یک مشتری واقعی</span></div>
+    </div>
+    <p class="fine">این اعداد از اجرای آزمایشی روی ۸ پیام نمونه است، نه ارزیابی آماری. در داشبورد، هزینه و دقت با داده‌ی خودتان و بازخورد شما محاسبه می‌شود.</p>
+  </section>
 
-                const authModalRef = ref(null);
+  <section>
+    <div class="band">
+      <div><h2 style="margin:0">با یک گروه واقعی امتحانش کن</h2><p class="sub" style="margin:0">محصولت را توضیح بده، پیام‌ها را بگذار و نتیجه را با دلیل ببین.</p></div>
+      <button class="btn p open" style="padding:13px 30px">ورود به کاشف</button>
+    </div>
+  </section>
 
-                const openAuthModal = () => {
-                    modalInstance = new bootstrap.Modal(authModalRef.value);
-                    modalInstance.show();
-                };
+  <footer><span>کاشف · ساخته‌شده برای رویداد BuildX کوئرا</span><span>توسعه‌ی امیررضا پروانه</span></footer>
+</div>
 
-                const closeAuthModal = () => {
-                    if (modalInstance) modalInstance.hide();
-                };
+<dialog id="dlg" aria-labelledby="dt">
+  <div class="dh"><h3 id="dt">ورود به کاشف</h3><button class="x" id="close" aria-label="بستن">×</button></div>
+  <div id="s1">
+    <label for="phone">شماره‌ی موبایل (با ۰۹ شروع شود)</label>
+    <input class="in" id="phone" inputmode="numeric" maxlength="11" placeholder="۰۹۱۲۳۴۵۶۷۸۹" autocomplete="tel">
+    <button class="btn p" id="send">دریافت کد تأیید</button>
+  </div>
+  <div id="s2" hidden>
+    <div class="row"><label for="code" style="margin:0">کد تأیید ۴ رقمی</label><button id="edit">ویرایش شماره</button></div>
+    <input class="in" id="code" inputmode="numeric" maxlength="4" placeholder="----" autocomplete="one-time-code">
+    <div class="row"><span id="tm"></span><button id="again" disabled>ارسال مجدد</button></div>
+    <button class="btn p" id="verify">تأیید و ورود به داشبورد</button>
+  </div>
+  <p class="err" id="err" role="alert"></p>
+</dialog>
 
-                const enToFaMap = {'0':'۰', '1':'۱', '2':'۲', '3':'۳', '4':'۴', '5':'۵', '6':'۶', '7':'۷', '8':'۸', '9':'۹'};
-                const faToEnMap = {'۰':'0', '۱':'1', '۲':'2', '۳':'3', '۴':'4', '۵':'5', '۶':'6', '۷':'7', '۸':'8', '۹':'9'};
+<script>
+const $ = s => document.querySelector(s);
+const D = '۰۱۲۳۴۵۶۷۸۹';
+const fa = s => String(s).replace(/[0-9]/g, d => D[d]);
+const en = s => String(s).replace(/[۰-۹]/g, d => D.indexOf(d));
+let timer = 0, tick = null;
 
-                const formatPersian = (str) => str.replace(/[0-9]/g, d => enToFaMap[d]);
-                const formatEnglish = (str) => str.replace(/[۰-۹]/g, d => faToEnMap[d]);
+const dlg = $('#dlg');
+document.querySelectorAll('.open').forEach(b => b.onclick = () => dlg.showModal());
+$('#close').onclick = () => dlg.close();
+dlg.onclick = e => { if (e.target === dlg) dlg.close(); };
 
-                const formatPhoneInput = (e) => {
-                    let val = e.target.value.replace(/[^0-9۰-۹]/g, '');
-                    phone.value = formatPersian(val);
-                };
+const digits = el => el.oninput = () => { el.value = fa(el.value.replace(/[^0-9۰-۹]/g, '')); };
+digits($('#phone')); digits($('#code'));
+const err = t => { $('#err').textContent = t || ''; };
+const busy = (b, on) => { b.disabled = on; };
 
-                const formatCodeInput = (e) => {
-                    let val = e.target.value.replace(/[^0-9۰-۹]/g, '');
-                    code.value = formatPersian(val);
-                };
+function startTimer() {
+  timer = 120; clearInterval(tick);
+  const draw = () => {
+    $('#tm').textContent = fa(String(Math.floor(timer / 60)).padStart(2, '0') + ':' + String(timer % 60).padStart(2, '0'));
+    $('#again').disabled = timer > 0;
+  };
+  draw();
+  tick = setInterval(() => { if (timer > 0) timer--; else clearInterval(tick); draw(); }, 1000);
+}
 
-                const startTimer = () => {
-                    timer.value = 120;
-                    clearInterval(timerInterval);
-                    timerInterval = setInterval(() => {
-                        if (timer.value > 0) {
-                            timer.value--;
-                        } else {
-                            clearInterval(timerInterval);
-                        }
-                    }, 1000);
-                };
+async function post(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'خطایی رخ داد. دوباره تلاش کنید.');
+  return data;
+}
 
-                const timerText = computed(() => {
-                    const m = String(Math.floor(timer.value / 60)).padStart(2, '0');
-                    const s = String(timer.value % 60).padStart(2, '0');
-                    return `${m}:${s}`;
-                });
+async function sendOTP() {
+  const phone = en($('#phone').value).trim();
+  if (!/^09\d{9}$/.test(phone)) return err('شماره‌ی موبایل معتبر ۱۱ رقمی وارد کنید (مثل ۰۹۱۲۳۴۵۶۷۸۹).');
+  err(''); busy($('#send'), true); busy($('#again'), true);
+  try {
+    await post('/api/auth/send-otp', { phone });
+    $('#s1').hidden = true; $('#s2').hidden = false; $('#code').value = ''; $('#code').focus();
+    startTimer();
+  } catch (e) { err(e.message); }
+  busy($('#send'), false); $('#again').disabled = timer > 0;
+}
 
-                const sendOTP = async () => {
-                    const cleanPhone = formatEnglish(phone.value).trim();
-                    if (!/^09\d{9}$/.test(cleanPhone)) {
-                        alert("لطفاً شماره موبایل معتبر ۱۱ رقمی (مانند ۰۹۱۲۳۴۵۶۷۸۹) وارد کنید.");
-                        return;
-                    }
+async function verifyOTP() {
+  const phone = en($('#phone').value).trim(), code = en($('#code').value).trim();
+  if (!code) return err('کد تأیید را وارد کنید.');
+  err(''); busy($('#verify'), true);
+  try {
+    await post('/api/auth/verify-otp', { phone, code });
+    location.reload();
+  } catch (e) { err(e.message); busy($('#verify'), false); }
+}
 
-                    loading.value = true;
-                    try {
-                        const res = await fetch('/api/auth/send-otp', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ phone: cleanPhone })
-                        });
-                        const data = await res.json();
-                        if (!res.ok) throw new Error(data.detail || "خطا در ارسال کد تایید");
-
-                        step.value = 2;
-                        startTimer();
-                    } catch (err) {
-                        alert(err.message);
-                    } finally {
-                        loading.value = false;
-                    }
-                };
-
-                const verifyOTP = async () => {
-                    const cleanPhone = formatEnglish(phone.value).trim();
-                    const cleanCode = formatEnglish(code.value).trim();
-
-                    if (!cleanCode) {
-                        alert("لطفاً کد تایید را وارد کنید.");
-                        return;
-                    }
-
-                    loading.value = true;
-                    try {
-                        const res = await fetch('/api/auth/verify-otp', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ phone: cleanPhone, code: cleanCode })
-                        });
-                        const data = await res.json();
-                        if (!res.ok) throw new Error(data.detail || "کد تایید نامعتبر است");
-
-                        window.location.reload();
-                    } catch (err) {
-                        alert(err.message);
-                    } finally {
-                        loading.value = false;
-                    }
-                };
-
-                return {
-                    step, phone, code, loading, timer, timerText,
-                    authModalRef, openAuthModal, formatPhoneInput, formatCodeInput,
-                    sendOTP, verifyOTP
-                };
-            }
-        }).mount('#app');
-    </script>
+$('#send').onclick = sendOTP;
+$('#again').onclick = sendOTP;
+$('#verify').onclick = verifyOTP;
+$('#edit').onclick = () => { $('#s2').hidden = true; $('#s1').hidden = false; err(''); clearInterval(tick); };
+$('#phone').onkeydown = e => { if (e.key === 'Enter') sendOTP(); };
+$('#code').onkeydown = e => { if (e.key === 'Enter') verifyOTP(); };
+</script>
 </body>
 </html>
