@@ -311,7 +311,8 @@ function renderStats(s) {
      <div class="kv"><span>اگر همه عمیق بررسی می‌شد (تخمین)</span><b>${toman(cost_deep)}</b></div>
      <div class="kv"><span>صرفه‌جویی</span><b>${fa(save * 100)}٪</b></div>
      <div class="kv"><span>دقت فرصت‌ها</span><b>${s.precision == null ? "—" : fa(s.precision * 100) + "٪"}</b></div>
-     <p class="hint" style="margin-top:8px">دقت از روی «درست بود/نادرست بود» شما حساب می‌شود (${fa(rated)} مورد). واحد هزینه: واحد اعتبار.</p>`;
+     <div class="kv"><span>نرخ دلار امروز</span><b>${fa(Math.round(rate))} تومان</b></div>
+     <p class="hint" style="margin-top:8px">نرخ از ${esc(s.exchange_rate_source || 'نرخ پیش‌فرض')} دریافت و هر ۶ ساعت به‌روزرسانی می‌شود. هزینه‌ها به تومان هستند. دقت از روی «درست بود/نادرست بود» شما حساب می‌شود (${fa(rated)} مورد).</p>`;
 }
 
 async function refresh() {

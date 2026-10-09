@@ -328,7 +328,21 @@ def stats(user=Depends(auth.current_user)):
     data["usd_to_rial"] = rate["rial"]
     data["usd_to_toman"] = rate["rial"] / 10
     data["exchange_rate_source"] = rate["source"]
+    data["exchange_rate_updated_at"] = rate["updated_at"]
     return data
+
+
+@app.get("/api/exchange-rate")
+def exchange_rate(user=Depends(auth.current_user)):
+    """Current USD rate used to convert all AI costs to toman."""
+    rate = usd_to_rial_rate()
+    return {
+        "usd_to_rial": rate["rial"],
+        "usd_to_toman": rate["rial"] / 10,
+        "source": rate["source"],
+        "updated_at": rate["updated_at"],
+        "refresh_seconds": config.EXCHANGE_RATE_REFRESH_SECONDS,
+    }
 
 
 @app.post("/api/subscriptions/purchase")
