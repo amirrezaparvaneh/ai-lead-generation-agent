@@ -292,11 +292,13 @@ def clear_results(user=Depends(auth.current_user)):
 
 @app.post("/api/results/{result_id}/feedback")
 def feedback(result_id: int, body: FeedbackIn, user=Depends(auth.current_user)):
-    db.execute(
+    updated = db.execute(
         "UPDATE results SET feedback=? WHERE id=? AND user_id=?",
         (int(body.good), result_id, user["id"]),
     )
-    return {"ok": True}
+    if not updated:
+        raise HTTPException(404, "نتیجه موردنظر پیدا نشد.")
+    return {"ok": True, "feedback": body.good}
 
 @app.get("/api/stats")
 def stats(user=Depends(auth.current_user)):
