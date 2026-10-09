@@ -1,4 +1,5 @@
 import json
+import os
 import pathlib
 import re
 import secrets
@@ -52,6 +53,27 @@ class AnalyzeIn(BaseModel):
 
 class FeedbackIn(BaseModel):
     good: bool
+
+
+class ReportIn(BaseModel):
+    kind: str
+    title: str = Field(min_length=3, max_length=120)
+    description: str = Field(min_length=10, max_length=4000)
+
+
+class ReviewReportIn(BaseModel):
+    action: str
+    message_credit: int = Field(default=0, ge=0, le=10000)
+    rial_credit: int = Field(default=0, ge=0, le=100_000_000)
+    note: str = Field(default="", max_length=1000)
+
+
+def require_admin(user=Depends(auth.current_user)):
+    admin_phones = {phone.strip() for phone in os.getenv("ADMIN_PHONES", "").split(",") if phone.strip()}
+    admin_emails = {email.strip().lower() for email in os.getenv("ADMIN_EMAILS", "").split(",") if email.strip()}
+    if user["phone"] not in admin_phones and user["email"].lower() not in admin_emails:
+        raise HTTPException(403, "admin access required")
+    return user
 
 def _login(response: Response, user_id: int):
     token = auth.new_session(user_id)
@@ -134,11 +156,13 @@ def process(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
     usage_res = db.query("SELECT COUNT(id) as c FROM results WHERE user_id=?", (user["id"],))
     current_usage = usage_res[0]["c"] if usage_res else 0
     
-    if current_usage >= MAX_QUOTA:
-        raise HTTPException(402, f"سقف مجاز شما ({MAX_QUOTA} پیام) به پایان رسیده است.")
+    wallet = db.wallet(user["id"])
+    free_capacity = max(0, MAX_QUOTA - current_usage)
+    allowed_capacity = free_capacity + wallet["message_credit"]
+    if not allowed_capacity:
+        raise HTTPException(402, "سقف مجاز شما به پایان رسیده است. با گزارش باگ یا پیشنهاد مؤثر، اعتبار پیام دریافت کنید.")
 
     messages = [m.strip()[:1000] for m in body.messages if m.strip()]
-    allowed_capacity = MAX_QUOTA - current_usage
     limit = min(MAX_MESSAGES, allowed_capacity)
     messages = messages[:limit]
 
@@ -165,7 +189,8 @@ def process(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
         with PROGRESS_LOCK:
             PROGRESS.pop(user["id"], None)
 
-    return {"ids": ids, "usage": {"current": current_usage + len(messages), "max": MAX_QUOTA}}
+    credited_messages_used = db.consume_message_credit(user["id"], max(0, len(messages) - free_capacity))
+    return {"ids": ids, "usage": {"current": current_usage + len(messages), "max": MAX_QUOTA}, "message_credit_used": credited_messages_used}
 
 
 @app.get("/api/progress")
@@ -198,6 +223,63 @@ def feedback(result_id: int, body: FeedbackIn, user=Depends(auth.current_user)):
 @app.get("/api/stats")
 def stats(user=Depends(auth.current_user)):
     return db.stats(user["id"])
+
+
+@app.get("/api/wallet")
+def get_wallet(user=Depends(auth.current_user)):
+    return {"balance": db.wallet(user["id"]), "transactions": db.query("SELECT message_credit, rial_credit, description, created_at FROM wallet_transactions WHERE user_id=? ORDER BY id DESC LIMIT 20", (user["id"],))}
+
+
+@app.get("/api/reports")
+def get_reports(user=Depends(auth.current_user)):
+    return db.query("SELECT id, kind, title, description, status, admin_note, created_at, reviewed_at FROM reports WHERE user_id=? ORDER BY id DESC", (user["id"],))
+
+
+@app.post("/api/reports")
+@limiter.limit("10/hour")
+def create_report(request: Request, body: ReportIn, user=Depends(auth.current_user)):
+    if body.kind not in {"bug", "suggestion"}:
+        raise HTTPException(400, "invalid report type")
+    report_id = db.execute("INSERT INTO reports(user_id, kind, title, description) VALUES(?,?,?,?)", (user["id"], body.kind, body.title.strip(), body.description.strip()))
+    return {"id": report_id, "status": "pending"}
+
+
+@app.get("/api/admin/overview")
+def admin_overview(user=Depends(require_admin)):
+    return {
+        "users": db.query("SELECT COUNT(*) AS count FROM users")[0]["count"],
+        "reports_pending": db.query("SELECT COUNT(*) AS count FROM reports WHERE status='pending'")[0]["count"],
+        "reports_approved": db.query("SELECT COUNT(*) AS count FROM reports WHERE status='approved'")[0]["count"],
+        "reports_rejected": db.query("SELECT COUNT(*) AS count FROM reports WHERE status='rejected'")[0]["count"],
+        "results": db.query("SELECT COUNT(*) AS count FROM results")[0]["count"],
+    }
+
+
+@app.get("/api/admin/reports")
+def admin_reports(status: str = "pending", user=Depends(require_admin)):
+    if status not in {"pending", "approved", "rejected", "all"}:
+        raise HTTPException(400, "invalid status")
+    sql = "SELECT r.*, u.email, u.phone FROM reports r JOIN users u ON u.id=r.user_id"
+    args = ()
+    if status != "all":
+        sql += " WHERE r.status=?"
+        args = (status,)
+    return db.query(sql + " ORDER BY r.id DESC", args)
+
+
+@app.post("/api/admin/reports/{report_id}/review")
+def review_report(report_id: int, body: ReviewReportIn, user=Depends(require_admin)):
+    try:
+        if body.action == "approve":
+            db.credit_report(report_id, body.message_credit, body.rial_credit, body.note.strip())
+        elif body.action == "reject":
+            db.reject_report(report_id, body.note.strip())
+        else:
+            raise HTTPException(400, "invalid review action")
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    return {"ok": True}
+
 
 class SendOTPRequest(BaseModel):
     phone: str

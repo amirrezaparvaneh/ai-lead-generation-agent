@@ -17,6 +17,18 @@ CREATE TABLE IF NOT EXISTS results(
     stage TEXT NOT NULL, is_lead INTEGER NOT NULL, score INTEGER, reason TEXT,
     analysis TEXT, draft TEXT, tokens INTEGER NOT NULL, cost REAL NOT NULL,
     feedback INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS wallets(
+    user_id INTEGER PRIMARY KEY, message_credit INTEGER NOT NULL DEFAULT 0,
+    rial_credit INTEGER NOT NULL DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS reports(
+    id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('bug', 'suggestion')),
+    title TEXT NOT NULL, description TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending'
+    CHECK(status IN ('pending', 'approved', 'rejected')), admin_note TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP, reviewed_at TEXT);
+CREATE TABLE IF NOT EXISTS wallet_transactions(
+    id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, report_id INTEGER UNIQUE,
+    message_credit INTEGER NOT NULL DEFAULT 0, rial_credit INTEGER NOT NULL DEFAULT 0,
+    description TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 """
 
 
@@ -78,3 +90,40 @@ def feedback_examples(user_id, limit=5):
         "ORDER BY id DESC LIMIT ?",
         (user_id, limit),
     )
+
+
+def wallet(user_id):
+    with conn() as c:
+        c.execute("INSERT OR IGNORE INTO wallets(user_id) VALUES(?)", (user_id,))
+        return dict(c.execute("SELECT message_credit, rial_credit FROM wallets WHERE user_id=?", (user_id,)).fetchone())
+
+
+def consume_message_credit(user_id, amount):
+    with conn() as c:
+        c.execute("INSERT OR IGNORE INTO wallets(user_id) VALUES(?)", (user_id,))
+        balance = c.execute("SELECT message_credit FROM wallets WHERE user_id=?", (user_id,)).fetchone()["message_credit"]
+        used = min(balance, amount)
+        if used:
+            c.execute("UPDATE wallets SET message_credit=message_credit-?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?", (used, user_id))
+            c.execute("INSERT INTO wallet_transactions(user_id, message_credit, rial_credit, description) VALUES(?,?,?,?)", (user_id, -used, 0, "مصرف اعتبار پیام برای تحلیل"))
+        return used
+
+
+def credit_report(report_id, message_credit, rial_credit, note):
+    with conn() as c:
+        report = c.execute("SELECT user_id, status FROM reports WHERE id=?", (report_id,)).fetchone()
+        if not report:
+            raise ValueError("report not found")
+        if report["status"] != "pending":
+            raise ValueError("report already reviewed")
+        c.execute("UPDATE reports SET status='approved', admin_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?", (note, report_id))
+        c.execute("INSERT OR IGNORE INTO wallets(user_id) VALUES(?)", (report["user_id"],))
+        c.execute("UPDATE wallets SET message_credit=message_credit+?, rial_credit=rial_credit+?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?", (message_credit, rial_credit, report["user_id"]))
+        c.execute("INSERT INTO wallet_transactions(user_id, report_id, message_credit, rial_credit, description) VALUES(?,?,?,?,?)", (report["user_id"], report_id, message_credit, rial_credit, note or "پاداش گزارش"))
+
+
+def reject_report(report_id, note):
+    with conn() as c:
+        updated = c.execute("UPDATE reports SET status='rejected', admin_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'", (note, report_id)).rowcount
+        if not updated:
+            raise ValueError("report not found or already reviewed")
