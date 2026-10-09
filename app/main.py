@@ -334,7 +334,7 @@ def stats(user=Depends(auth.current_user)):
 @app.post("/api/subscriptions/purchase")
 @limiter.limit("5/minute")
 def purchase_subscription(request: Request, body: SubscriptionIn, user=Depends(auth.current_user)):
-    plans = {"professional_monthly": {"name": "حرفه‌ای ماهانه", "message_credit": 2000, "amount": 490_000}}
+    plans = {"professional_monthly": {"name": "حرفه‌ای ماهانه", "message_credit": 2000, "amount": 4_900_000}}
     plan = plans.get(body.plan)
     if not plan:
         raise HTTPException(400, "invalid subscription plan")
