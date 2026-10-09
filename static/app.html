@@ -113,7 +113,12 @@ async function api(path, method = 'GET', body) {
   }
   return r.json();
 }
-const show = ok => { $('#auth').hidden = ok; $('#app').hidden = !ok; };
+function show(authed) {
+  const appEl = document.getElementById('app');
+  const authEl = document.getElementById('auth');
+  if (appEl) appEl.hidden = !authed;
+  if (authEl) authEl.hidden = authed;
+}
 const say = (sel, t) => { $(sel).textContent = t || ''; };
 
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
@@ -145,8 +150,8 @@ $('#run').onclick = async () => {
 function safeUrl(value) {
   try { const u = new URL(value, location.origin); return ['http:', 'https:', 'tg:'].includes(u.protocol) ? u.href : '#'; } catch { return '#'; }
 }
+function renderList() {
 
-  const rows = results.filter(r => $('#all').checked || r.is_lead);
   if (!rows.length) { $('#list').innerHTML = `<div class="empty">${results.length ? 'مشتری مناسبی پیدا نشد.' : 'هنوز پیامی بررسی نشده. محصول را بنویس، پیام‌ها را بگذار و «پیدا کردن مشتری‌ها» را بزن.'}</div>`; return; }
   $('#list').innerHTML = rows.map(r => {
     const tag = r.is_lead ? 'مشتری مناسب' : r.stage === 'error' ? 'خطا' : r.stage === 'fit' ? 'تناسب کافی نبود' : 'در غربال رد شد';
