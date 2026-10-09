@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>داشبورد نشانه</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alan+Sans:wght@400;600;700;900&display=swap">
+<style>
+:root{--bg:#f5f6fa;--card:#fff;--ink:#1b2236;--mute:#667085;--line:#dfe3ee;--brand:#1f3fd8;--lead:#1d7a5a;--leadbg:#e5f4ee;--bad:#b3412f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.9 'Alan Sans',Tahoma,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:var(--card);border-bottom:1px solid var(--line)}
+header b{font-size:20px;font-weight:800;color:var(--brand)}
+main{max-width:1100px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:20px}
+h2{margin:0 0 4px;font-size:17px}
+p.hint{margin:0 0 12px;color:var(--mute);font-size:13px}
+textarea,input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit;background:#fff}
+textarea{min-height:110px;resize:vertical}
+input[type=email],input[type=password]{direction:ltr;text-align:left;margin-bottom:10px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 14px;color:var(--ink)}
+button.go{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:wait}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center}
+.auth{max-width:380px;margin:60px auto}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.err{color:var(--bad);font-size:13px;margin-top:8px;min-height:20px}
+.item{border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:12px}
+.item.lead{border-color:#9fd3bd;background:var(--leadbg)}
+.msg{font-weight:600}
+.tag{display:inline-block;font-size:12px;padding:1px 10px;border-radius:99px;background:#eceef5;color:var(--mute)}
+.lead .tag{background:var(--lead);color:#fff}
+.why{color:var(--mute);font-size:13px;margin:6px 0}
+.draft{background:#fff;border:1px dashed #9fd3bd;border-radius:8px;padding:10px;margin:8px 0;white-space:pre-wrap}
+.meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--mute)}
+.sender{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}.sender-name{font-weight:700}.sender-handle{color:var(--brand);font-size:13px;direction:ltr;text-align:right}.lead-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.lead-actions a,.lead-actions button{font-size:13px;text-decoration:none}.telegram{background:#229ED9;color:#fff;border-color:#229ED9}.outline{background:transparent}
+.fn div.l{display:flex;justify-content:space-between;font-size:13px}
+.bar{height:10px;background:#eceef5;border-radius:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--brand)}
+.bar i.g{background:var(--lead)}
+.kv{display:flex;justify-content:space-between;font-size:14px;padding:4px 0;border-top:1px solid var(--line)}
+.empty{color:var(--mute);padding:14px 0}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="auth" class="auth" hidden>
+  <section>
+    <h2>کاشف مشتری</h2>
+    <p class="hint">پیام‌های یک گروه را بده؛ فقط کسانی را می‌بینی که واقعاً به محصولت نیاز دارند.</p>
+    <div class="tabs">
+      <button class="tab on" data-m="login">ورود</button>
+      <button class="tab" data-m="register">ثبت‌نام</button>
+    </div>
+    <form id="authForm">
+      <input id="email" type="email" placeholder="ایمیل" required>
+      <input id="pw" type="password" placeholder="رمز عبور (حداقل ۶ کاراکتر)" required>
+      <button id="authBtn" class="go" style="width:100%">ورود</button>
+    </form>
+    <div class="err" id="authErr"></div>
+  </section>
+</div>
+
+<div id="app" hidden>
+  <header><b>نشانه</b><span><span id="who" style="display:inline-block;margin-left:8px"></span> <a href="/rewards.html" style="margin-left:12px;color:var(--brand);text-decoration:none">کیف پول و بازخورد</a> <button id="out">خروج</button></span></header>
+  <main>
+    <div>
+      <section>
+        <h2>محصول شما</h2>
+        <p class="hint">چه چیزی می‌فروشی و برای چه کسی مناسب است؟</p>
+        <textarea id="product" placeholder="مثلاً: دوره‌ی ۸ هفته‌ای پایتون برای مبتدیان، آنلاین و پروژه‌محور"></textarea>
+      </section>
+      <section>
+        <h2>پیام‌های گروه</h2>
+        <p class="hint">هر پیام در یک خط. پیام‌های قبلی به‌عنوان زمینه‌ی گفتگو خوانده می‌شوند.</p>
+        <textarea id="msgs" style="min-height:160px"></textarea>
+        <div class="row">
+          <button id="run" class="go">پیدا کردن مشتری‌ها</button>
+          <button id="sample">پیام‌های نمونه</button>
+        </div>
+        <div class="err" id="err"></div>
+      </section>
+      <section>
+        <div class="row" style="justify-content:space-between;margin:0">
+          <h2>نتیجه‌ها</h2>
+          <label><input type="checkbox" id="all" style="width:auto"> نمایش پیام‌های ردشده</label>
+        </div>
+        <div id="list"></div>
+      </section>
+    </div>
+    <aside>
+      <section id="stats"></section>
+    </aside>
+  </main>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const fa = (n, d = 0) => Number(n).toLocaleString('fa-IR', {maximumFractionDigits: d});
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let mode = 'login', results = [];
+
+async function api(path, method = 'GET', body) {
+  const r = await fetch(path, {method, headers: body ? {'Content-Type': 'application/json'} : {}, body: body ? JSON.stringify(body) : undefined});
+  if (!r.ok) {
+    if (r.status === 401 && !path.match(/login|register/)) show(false);
+    const e = await r.json().catch(() => ({}));
+    throw new Error(typeof e.detail === 'string' ? e.detail : 'ورودی نامعتبر است');
+  }
+  return r.json();
+}
+const show = ok => { $('#auth').hidden = ok; $('#app').hidden = !ok; };
+const say = (sel, t) => { $(sel).textContent = t || ''; };
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  mode = t.dataset.m;
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
+  $('#authBtn').textContent = mode === 'login' ? 'ورود' : 'ساخت حساب';
+});
+$('#authForm').onsubmit = async e => {
+  e.preventDefault();
+  try { await api('/api/' + mode, 'POST', {email: $('#email').value, password: $('#pw').value}); say('#authErr'); await boot(); }
+  catch (x) { say('#authErr', x.message === 'wrong email or password' ? 'ایمیل یا رمز اشتباه است' : x.message === 'email already registered' ? 'این ایمیل قبلاً ثبت شده' : x.message); }
+};
+$('#out').onclick = async () => { await api('/api/logout', 'POST').catch(() => {}); location.href = '/'; };
+$('#sample').onclick = async () => { const s = await api('/api/sample'); $('#product').value = s.product; $('#msgs').value = s.messages.join('\n'); };
+$('#all').onchange = renderList;
+
+$('#run').onclick = async () => {
+  const msgs = $('#msgs').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if ($('#product').value.trim().length < 10 || !msgs.length) return say('#err', 'محصول و حداقل یک پیام لازم است.');
+  say('#err'); $('#run').disabled = true; $('#run').textContent = 'در حال بررسی…';
+  try {
+    await api('/api/product', 'PUT', {text: $('#product').value});
+    await api('/api/analyze', 'POST', {messages: msgs});
+    await refresh();
+  } catch (x) { say('#err', x.message); }
+  $('#run').disabled = false; $('#run').textContent = 'پیدا کردن مشتری‌ها';
+};
+
+function safeUrl(value) {
+  try { const u = new URL(value, location.origin); return ['http:', 'https:', 'tg:'].includes(u.protocol) ? u.href : '#'; } catch { return '#'; }
+}
+
+  const rows = results.filter(r => $('#all').checked || r.is_lead);
+  if (!rows.length) { $('#list').innerHTML = `<div class="empty">${results.length ? 'مشتری مناسبی پیدا نشد.' : 'هنوز پیامی بررسی نشده. محصول را بنویس، پیام‌ها را بگذار و «پیدا کردن مشتری‌ها» را بزن.'}</div>`; return; }
+  $('#list').innerHTML = rows.map(r => {
+    const tag = r.is_lead ? 'مشتری مناسب' : r.stage === 'error' ? 'خطا' : r.stage === 'fit' ? 'تناسب کافی نبود' : 'در غربال رد شد';
+    const fb = r.is_lead ? `<button data-id="${r.id}" data-g="1" class="${r.feedback === 1 ? 'on' : ''}">درست بود</button><button data-id="${r.id}" data-g="0" class="${r.feedback === 0 ? 'on' : ''}">نادرست بود</button>` : '';
+    return `<div class="item ${r.is_lead ? 'lead' : ''}">
+      ${r.sender_name || r.sender_username || r.sender_id ? `<div class="sender"><div><div class="sender-name">${esc(r.sender_name || 'کاربر تلگرام')}</div>${r.sender_username ? `<div class="sender-handle">@${esc(r.sender_username.replace(/^@/, ''))}</div>` : r.sender_id ? `<div class="why">شناسه: ${esc(r.sender_id)}</div>` : ''}</div>${r.sender_username ? `<a class="btn telegram" target="_blank" rel="noopener noreferrer" href="https://t.me/${encodeURIComponent(r.sender_username.replace(/^@/, ''))}">پیام در تلگرام 💬</a>` : r.sender_id ? `<a class="btn telegram" target="_blank" rel="noopener noreferrer" href="tg://user?id=${encodeURIComponent(r.sender_id)}">پیام در تلگرام 💬</a>` : ''}</div>` : ''}
+      <div class="msg">${esc(r.text)}</div>
+      <div class="meta"><span class="tag">${tag}</span>${r.score != null ? `<span>امتیاز تناسب ${fa(r.score)}</span>` : ''}<span>هزینه ${fa(r.cost, 5)} واحد</span></div>
+      <div class="why">${esc(r.reason)}</div>
+      ${r.draft ? `<div class="draft">${esc(r.draft)}</div><div class="lead-actions"><button data-copy="${r.id}">📋 کپی پاسخ</button>${fb}${r.message_link ? `<a class="outline" target="_blank" rel="noopener noreferrer" href="${safeUrl(r.message_link)}">🔗 پیام در گروه</a>` : ''}</div>` : r.message_link ? `<div class="lead-actions"><a class="outline" target="_blank" rel="noopener noreferrer" href="${safeUrl(r.message_link)}">🔗 پیام در گروه</a></div>` : ''}
+    </div>`;
+  }).join('');
+}
+$('#list').onclick = async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.copy) { const r = results.find(x => x.id == b.dataset.copy); await navigator.clipboard.writeText(r.draft); b.textContent = 'کپی شد'; return; }
+  if (b.dataset.id) { await api(`/api/results/${b.dataset.id}/feedback`, 'POST', {good: b.dataset.g === '1'}); await refresh(); }
+};
+
+function renderStats(s) {
+  const n = s.messages, t = s.by_stage.triage || 0, er = s.by_stage.error || 0;
+  const rows = [['همه‌ی پیام‌ها', n, ''], ['رد نشده در غربال', n - t - er, ''], ['مشتری مناسب', s.leads, 'g']];
+  const save = s.cost_if_all_deep > 0 ? Math.max(0, 1 - s.total_cost / s.cost_if_all_deep) : 0;
+  $('#stats').innerHTML = `<h2>هزینه و کیفیت</h2><p class="hint">هر پیام از چند مرحله می‌گذرد؛ مرحله‌های گران فقط برای پیام‌های مرتبط اجرا می‌شود.</p>` +
+    rows.map(([l, v, c]) => `<div class="fn"><div class="l"><span>${l}</span><b>${fa(v)}</b></div><div class="bar"><i class="${c}" style="width:${n ? v / n * 100 : 0}%"></i></div></div>`).join('') +
+    `<div class="kv"><span>هزینه‌ی کل</span><b>${fa(s.total_cost, 4)}</b></div>
+     <div class="kv"><span>هر پیام (میانگین)</span><b>${fa(s.avg_cost_per_message, 5)}</b></div>
+     <div class="kv"><span>اگر همه عمیق بررسی می‌شد (تخمین)</span><b>${fa(s.cost_if_all_deep, 4)}</b></div>
+     <div class="kv"><span>صرفه‌جویی</span><b>${fa(save * 100)}٪</b></div>
+     <div class="kv"><span>دقت فرصت‌ها</span><b>${s.precision == null ? '—' : fa(s.precision * 100) + '٪'}</b></div>
+     <p class="hint" style="margin-top:8px">دقت از روی «درست بود/نادرست بود» شما حساب می‌شود (${fa(s.rated_leads)} مورد). واحد هزینه: واحد اعتبار.</p>`;
+}
+
+async function refresh() {
+  const [r, s] = await Promise.all([api('/api/results'), api('/api/stats')]);
+  results = r; renderList(); renderStats(s);
+}
+async function boot() {
+  try {
+    const me = await api('/api/me');
+    show(true);
+    const fullName = [me.first_name, me.last_name].filter(Boolean).join(' ');
+    $('#who').textContent = fullName ? `${fullName} (${me.email || me.phone || ''})` : (me.email || me.phone || 'کاربر نشانه');
+    if (me.product) $('#product').value = me.product;
+    await refresh();
+  } catch {
+    location.href = '/';
+  }
+}
+boot();
+</script>
+</body>
+</html>

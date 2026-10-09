@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS products(
     user_id INTEGER PRIMARY KEY, text TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS results(
     id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, text TEXT NOT NULL,
+    sender_name TEXT, sender_username TEXT, sender_id TEXT, message_link TEXT,
+    telegram_update_id TEXT,
     stage TEXT NOT NULL, is_lead INTEGER NOT NULL, score INTEGER, reason TEXT,
     analysis TEXT, draft TEXT, tokens INTEGER NOT NULL, cost REAL NOT NULL,
     feedback INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
@@ -22,7 +24,7 @@ CREATE TABLE IF NOT EXISTS wallets(
     rial_credit INTEGER NOT NULL DEFAULT 0, updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS reports(
     id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('bug', 'suggestion')),
-    title TEXT NOT NULL, description TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending'
+    title TEXT NOT NULL, description TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
     CHECK(status IN ('pending', 'approved', 'rejected')), admin_note TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP, reviewed_at TEXT);
 CREATE TABLE IF NOT EXISTS wallet_transactions(
@@ -57,6 +59,10 @@ def init():
         if 'last_name' not in columns:
             c.execute('ALTER TABLE users ADD COLUMN last_name TEXT')
         c.execute('CREATE UNIQUE INDEX IF NOT EXISTS users_phone ON users(phone)')
+        result_columns = {row['name'] for row in c.execute('PRAGMA table_info(results)')}
+        for column in ('sender_name', 'sender_username', 'sender_id', 'message_link', 'telegram_update_id'):
+            if column not in result_columns:
+                c.execute(f'ALTER TABLE results ADD COLUMN {column} TEXT')
 
 
 def query(sql, args=()):

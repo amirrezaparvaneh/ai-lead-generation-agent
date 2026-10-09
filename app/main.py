@@ -5,9 +5,9 @@ import re
 import secrets
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Optional
+from typing import List, Optional, Union
 
-from fastapi import Cookie, Depends, FastAPI, HTTPException, Response, Request
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Response, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -51,10 +51,19 @@ class RegistrationIn(Credentials):
 
 class ProductIn(BaseModel):
     text: str = Field(min_length=10, max_length=2000)
+class MessageIn(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+    sender_name: Optional[str] = Field(default=None, max_length=100)
+    sender_username: Optional[str] = Field(default=None, max_length=100)
+    sender_id: Optional[str] = Field(default=None, max_length=50)
+    message_link: Optional[str] = Field(default=None, max_length=255)
+    telegram_update_id: Optional[str] = Field(default=None, max_length=100)
+
 
 class AnalyzeIn(BaseModel):
-    messages: List[str]
+    messages: List[Union[str, MessageIn]]
     source: str = "نامشخص"  # اتصال پلتفرم به بک‌اند
+
 
 class FeedbackIn(BaseModel):
     good: bool
@@ -144,22 +153,74 @@ def sample():
     data = json.loads(path.read_text(encoding="utf-8"))
     return {"product": data["product"], "messages": [m["text"] for m in data["messages"]]}
 
-def _store(user_id, text, state):
+def _store(user_id, message, state):
+    """Store the analyzed message with sender identity and Telegram permalink."""
     fit, triage = state.get("fit"), state.get("triage")
     reason = (fit or triage or {}).get("reason") or state.get("error")
-    rid = db.execute(
-        "INSERT INTO results(user_id, text, stage, is_lead, score, reason, analysis, "
-        "draft, tokens, cost) VALUES(?,?,?,?,?,?,?,?,?,?)",
+    return db.execute(
+        "INSERT INTO results(user_id, text, sender_name, sender_username, sender_id, message_link, telegram_update_id, "
+        "stage, is_lead, score, reason, analysis, draft, tokens, cost) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
-            user_id, text, state["stage"], int(state["stage"] == "draft"),
-            fit["score"] if fit else None, reason,
-            json.dumps(state.get("analysis"), ensure_ascii=False),
-            (state.get("draft") or {}).get("reply"),
+            user_id, message["text"], message.get("sender_name"), message.get("sender_username"),
+            message.get("sender_id"), message.get("message_link"), message.get("telegram_update_id"),
+            state["stage"], int(state["stage"] == "draft"), fit["score"] if fit else None, reason,
+            json.dumps(state.get("analysis"), ensure_ascii=False), (state.get("draft") or {}).get("reply"),
             state["tokens"], state["cost"],
         ),
     )
-    return rid
 
+def telegram_webhook_key(x_telegram_webhook_secret: Optional[str] = Header(default=None)):
+    expected = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
+    if not expected or x_telegram_webhook_secret != expected:
+        raise HTTPException(401, "invalid telegram webhook secret")
+
+
+def _telegram_message_link(chat, message_id):
+    if not message_id:
+        return None
+    username = chat.get("username")
+    if username:
+        return f"https://t.me/{username}/{message_id}"
+    chat_id = str(chat.get("id", ""))
+    clean_id = chat_id[4:] if chat_id.startswith("-100") else chat_id.lstrip("-")
+    return f"https://t.me/c/{clean_id}/{message_id}" if clean_id else None
+
+
+@app.post("/api/leads/telegram-webhook")
+@limiter.limit("120/minute")
+async def telegram_webhook(request: Request, _: None = Depends(telegram_webhook_key)):
+    data = await request.json()
+    message = data.get("message") or {}
+    raw_text = (message.get("text") or "").strip()
+    if not raw_text:
+        return {"status": "ignored_no_text"}
+
+    from_user = message.get("from") or {}
+    chat = message.get("chat") or {}
+    sender_name = f"{from_user.get('first_name', '')} {from_user.get('last_name', '')}".strip() or "کاربر تلگرام"
+    sender_username = from_user.get("username")
+    sender_id = str(from_user["id"]) if from_user.get("id") is not None else None
+    message_id = message.get("message_id")
+    update_id = str(data["update_id"]) if data.get("update_id") is not None else None
+    message_link = _telegram_message_link(chat, message_id)
+
+    # این روت باید به یک کاربر/محصول متصل باشد؛ تنظیمات اختصاصی تلگرام در مرحله اتصال افزوده می‌شود.
+    users = db.query("SELECT id FROM users ORDER BY id LIMIT 1")
+    if not users:
+        raise HTTPException(503, "no user is configured for telegram webhook")
+    if update_id and db.query("SELECT id FROM results WHERE telegram_update_id=?", (update_id,)):
+        return {"status": "duplicate", "update_id": update_id}
+
+    product = db.query("SELECT text FROM products WHERE user_id=?", (users[0]["id"],))
+    if not product:
+        raise HTTPException(409, "set a product before receiving telegram messages")
+    examples = db.feedback_examples(users[0]["id"])
+    state = evaluate(product[0]["text"], raw_text, [], "telegram", examples)
+    result_id = _store(users[0]["id"], {
+        "text": raw_text, "sender_name": sender_name, "sender_username": sender_username,
+        "sender_id": sender_id, "message_link": message_link, "telegram_update_id": update_id,
+    }, state)
+    return {"status": "success", "lead_id": result_id, "is_lead": state.get("stage") == "draft"}
 @app.post("/api/process")
 @limiter.limit("30/minute")  # سقف رو برای زمان تست بالا بردیم تا خطای اسپم ندهد
 def process(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
@@ -176,7 +237,11 @@ def process(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
     if not allowed_capacity:
         raise HTTPException(402, "سقف مجاز شما به پایان رسیده است. با گزارش باگ یا پیشنهاد مؤثر، اعتبار پیام دریافت کنید.")
 
-    messages = [m.strip()[:1000] for m in body.messages if m.strip()]
+    messages = []
+    for item in body.messages:
+        message = item if isinstance(item, MessageIn) else MessageIn(text=item)
+        messages.append(message.model_dump())
+    messages = [{**m, "text": m["text"].strip()[:1000]} for m in messages if m["text"].strip()]
     limit = min(MAX_MESSAGES, allowed_capacity)
     messages = messages[:limit]
 
@@ -189,16 +254,13 @@ def process(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
         PROGRESS[user["id"]] = {"done": 0, "total": total}
 
     def work(i):
-        context = messages[max(0, i - CONTEXT_WINDOW):i]
-        result = evaluate(product[0]["text"], messages[i], context, body.source, examples)
-        with PROGRESS_LOCK:
-            PROGRESS[user["id"]]["done"] += 1
-        return result
+        context = [item["text"] for item in messages[max(0, i - CONTEXT_WINDOW):i]]
+        return evaluate(product[0]["text"], messages[i]["text"], context, body.source, examples)
 
     try:
         with ThreadPoolExecutor(max_workers=1) as pool:
             states = list(pool.map(work, range(len(messages))))
-        ids = [_store(user["id"], t, s) for t, s in zip(messages, states)]
+        ids = [_store(user["id"], message, state) for message, state in zip(messages, states)]
     finally:
         with PROGRESS_LOCK:
             PROGRESS.pop(user["id"], None)
