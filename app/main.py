@@ -7,7 +7,7 @@ import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Union
 
-from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Response, Request
+from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, Header, HTTPException, Response, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -163,7 +163,7 @@ def _store(user_id, message, state):
         (
             user_id, message["text"], message.get("sender_name"), message.get("sender_username"),
             message.get("sender_id"), message.get("message_link"), message.get("telegram_update_id"),
-            state["stage"], int(state["stage"] == "draft"), fit["score"] if fit else None, reason,
+            state["stage"], int(state["stage"] in ("draft", "review") and bool(state.get("draft"))), fit["score"] if fit else None, reason,
             json.dumps(state.get("analysis"), ensure_ascii=False), (state.get("draft") or {}).get("reply"),
             state["tokens"], state["cost"],
         ),
@@ -220,10 +220,10 @@ async def telegram_webhook(request: Request, _: None = Depends(telegram_webhook_
         "text": raw_text, "sender_name": sender_name, "sender_username": sender_username,
         "sender_id": sender_id, "message_link": message_link, "telegram_update_id": update_id,
     }, state)
-    return {"status": "success", "lead_id": result_id, "is_lead": state.get("stage") == "draft"}
+    return {"status": "success", "lead_id": result_id, "is_lead": state.get("stage") in ("draft", "review") and bool(state.get("draft"))}
 @app.post("/api/process")
 @limiter.limit("30/minute")  # سقف رو برای زمان تست بالا بردیم تا خطای اسپم ندهد
-def process(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
+def process(request: Request, body: AnalyzeIn, background_tasks: BackgroundTasks, user=Depends(auth.current_user)):
     product = db.query("SELECT text FROM products WHERE user_id=?", (user["id"],))
     if not product:
         raise HTTPException(400, "set your product first")
@@ -253,21 +253,22 @@ def process(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
     with PROGRESS_LOCK:
         PROGRESS[user["id"]] = {"done": 0, "total": total}
 
-    def work(i):
-        context = [item["text"] for item in messages[max(0, i - CONTEXT_WINDOW):i]]
-        return evaluate(product[0]["text"], messages[i]["text"], context, body.source, examples)
+    def process_bg(u_id, p_text, msgs, src, ex_list):
+        def work(i):
+            ctx = [m["text"] for m in msgs[max(0, i - CONTEXT_WINDOW):i]]
+            return evaluate(p_text, msgs[i]["text"], ctx, src, ex_list)
+        try:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                states = list(pool.map(work, range(len(msgs))))
+            for m, s in zip(msgs, states):
+                _store(u_id, m, s)
+        finally:
+            with PROGRESS_LOCK:
+                PROGRESS.pop(u_id, None)
 
-    try:
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            states = list(pool.map(work, range(len(messages))))
-        ids = [_store(user["id"], message, state) for message, state in zip(messages, states)]
-    finally:
-        with PROGRESS_LOCK:
-            PROGRESS.pop(user["id"], None)
-
-    credited_messages_used = db.consume_message_credit(user["id"], max(0, len(messages) - free_capacity))
-    return {"ids": ids, "usage": {"current": current_usage + len(messages), "max": MAX_QUOTA}, "message_credit_used": credited_messages_used}
-
+    background_tasks.add_task(process_bg, user["id"], product[0]["text"], messages, body.source, examples)
+    return {"ok": True, "message": "در حال پردازش در پس‌زمینه..."}
 
 @app.get("/api/progress")
 def progress(user=Depends(auth.current_user)):
