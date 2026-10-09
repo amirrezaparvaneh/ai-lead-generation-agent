@@ -7,7 +7,7 @@ import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Response, Request
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Response, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -68,12 +68,20 @@ class ReviewReportIn(BaseModel):
     note: str = Field(default="", max_length=1000)
 
 
-def require_admin(user=Depends(auth.current_user)):
-    admin_phones = {phone.strip() for phone in os.getenv("ADMIN_PHONES", "").split(",") if phone.strip()}
-    admin_emails = {email.strip().lower() for email in os.getenv("ADMIN_EMAILS", "").split(",") if email.strip()}
-    if user["phone"] not in admin_phones and user["email"].lower() not in admin_emails:
-        raise HTTPException(403, "admin access required")
-    return user
+class AdminLoginIn(BaseModel):
+    username: str
+    password: str
+
+
+class CreditUserIn(BaseModel):
+    message_credit: int = Field(default=0, ge=0, le=10000)
+    rial_credit: int = Field(default=0, ge=0, le=100_000_000)
+    note: str = Field(default="", max_length=1000)
+
+
+def require_admin(admin_session: Optional[str] = Cookie(default=None)):
+    if not admin_session or not db.admin_session(admin_session):
+        raise HTTPException(401, "admin login required")
 
 def _login(response: Response, user_id: int):
     token = auth.new_session(user_id)
@@ -244,8 +252,28 @@ def create_report(request: Request, body: ReportIn, user=Depends(auth.current_us
     return {"id": report_id, "status": "pending"}
 
 
+@app.post("/api/admin/login")
+@limiter.limit("5/minute")
+def admin_login(request: Request, body: AdminLoginIn, response: Response):
+    username = os.getenv("ADMIN_USERNAME", "admin")
+    password = os.getenv("ADMIN_PASSWORD", "12345")
+    if not secrets.compare_digest(body.username, username) or not secrets.compare_digest(body.password, password):
+        raise HTTPException(401, "نام کاربری یا گذرواژه نادرست است.")
+    token = secrets.token_urlsafe(32)
+    db.execute("INSERT INTO admin_sessions(token) VALUES(?)", (token,))
+    response.set_cookie("admin_session", token, httponly=True, samesite="strict", max_age=8 * 3600)
+    return {"ok": True}
+
+
+@app.post("/api/admin/logout")
+def admin_logout(response: Response, admin=Depends(require_admin), admin_session: Optional[str] = Cookie(default=None)):
+    db.execute("DELETE FROM admin_sessions WHERE token=?", (admin_session,))
+    response.delete_cookie("admin_session")
+    return {"ok": True}
+
+
 @app.get("/api/admin/overview")
-def admin_overview(user=Depends(require_admin)):
+def admin_overview(admin=Depends(require_admin)):
     return {
         "users": db.query("SELECT COUNT(*) AS count FROM users")[0]["count"],
         "reports_pending": db.query("SELECT COUNT(*) AS count FROM reports WHERE status='pending'")[0]["count"],
@@ -253,6 +281,28 @@ def admin_overview(user=Depends(require_admin)):
         "reports_rejected": db.query("SELECT COUNT(*) AS count FROM reports WHERE status='rejected'")[0]["count"],
         "results": db.query("SELECT COUNT(*) AS count FROM results")[0]["count"],
     }
+
+
+@app.get("/api/admin/users")
+def admin_users(admin=Depends(require_admin)):
+    return db.query(
+        "SELECT u.id, u.email, u.phone, COUNT(r.id) AS messages, COALESCE(SUM(r.cost), 0) AS usage_cost, "
+        "COALESCE(w.message_credit, 0) AS message_credit, COALESCE(w.rial_credit, 0) AS rial_credit, "
+        "COALESCE((SELECT SUM(t.rial_credit) FROM wallet_transactions t WHERE t.user_id=u.id AND t.rial_credit > 0), 0) AS payments "
+        "FROM users u LEFT JOIN results r ON r.user_id=u.id LEFT JOIN wallets w ON w.user_id=u.id "
+        "GROUP BY u.id ORDER BY u.id DESC"
+    )
+
+
+@app.post("/api/admin/users/{user_id}/credit")
+def admin_credit_user(user_id: int, body: CreditUserIn, admin=Depends(require_admin)):
+    if not body.message_credit and not body.rial_credit:
+        raise HTTPException(400, "حداقل یک اعتبار وارد کنید.")
+    try:
+        db.credit_user(user_id, body.message_credit, body.rial_credit, body.note.strip())
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
+    return {"ok": True}
 
 
 @app.get("/api/admin/reports")

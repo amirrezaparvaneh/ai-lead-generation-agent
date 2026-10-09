@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS wallet_transactions(
     id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, report_id INTEGER UNIQUE,
     message_credit INTEGER NOT NULL DEFAULT 0, rial_credit INTEGER NOT NULL DEFAULT 0,
     description TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS admin_sessions(
+    token TEXT PRIMARY KEY, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 """
 
 
@@ -127,3 +129,16 @@ def reject_report(report_id, note):
         updated = c.execute("UPDATE reports SET status='rejected', admin_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'", (note, report_id)).rowcount
         if not updated:
             raise ValueError("report not found or already reviewed")
+
+
+def credit_user(user_id, message_credit, rial_credit, note):
+    with conn() as c:
+        if not c.execute("SELECT 1 FROM users WHERE id=?", (user_id,)).fetchone():
+            raise ValueError("user not found")
+        c.execute("INSERT OR IGNORE INTO wallets(user_id) VALUES(?)", (user_id,))
+        c.execute("UPDATE wallets SET message_credit=message_credit+?, rial_credit=rial_credit+?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?", (message_credit, rial_credit, user_id))
+        c.execute("INSERT INTO wallet_transactions(user_id, message_credit, rial_credit, description) VALUES(?,?,?,?)", (user_id, message_credit, rial_credit, note or "اعتبار دستی مدیر"))
+
+
+def admin_session(token):
+    return bool(query("SELECT 1 FROM admin_sessions WHERE token=?", (token,)))
