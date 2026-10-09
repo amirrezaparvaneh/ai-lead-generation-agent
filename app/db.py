@@ -70,3 +70,11 @@ def stats(user_id):
         "rated_leads": len(rated),
         "precision": good / len(rated) if rated else None,
     }
+
+def feedback_examples(user_id, limit=5):
+    return query(
+        "SELECT text, score, feedback FROM results "
+        "WHERE user_id=? AND feedback IS NOT NULL AND score IS NOT NULL "
+        "ORDER BY id DESC LIMIT ?",
+        (user_id, limit),
+    )

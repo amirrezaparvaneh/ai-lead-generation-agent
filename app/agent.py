@@ -38,6 +38,7 @@ class State(TypedDict):
     draft: Optional[dict]
     review: Optional[dict] # نتیجه بررسی منتقد
     revision_count: int  # تعداد دفعات بازنویسی
+    feedback_examples: list  # بازخورد تیم فروش روی موارد قبلی
     stage: str
     tokens: int
     cost: float
@@ -74,10 +75,21 @@ def analyze(state: State):
     return {"analysis": res, "stage": "analysis", **acc}
 
 def fit(state: State):
+    fb = state.get("feedback_examples") or []
+    fb_lines = []
+    for ex in fb[:5]:
+        verdict = "درست بود" if ex["feedback"] else "اشتباه بود (نباید نشانه شمرده می‌شد یا برعکس)"
+        fb_lines.append(f"- پیام قبلی: «{ex['text']}» | امتیاز دادی: {ex['score']} | نظر تیم فروش: این تشخیص {verdict}")
+    fb_block = (
+        "\n\nبازخورد تیم فروش روی تشخیص‌های قبلی خودت (برای کالیبره کردن قضاوت این بار استفاده کن، کورکورانه کپی نکن):\n"
+        + "\n".join(fb_lines)
+    ) if fb_lines else ""
+
     system = (
         "احتمال تبدیل شدن این فرد به مشتری (Lead Score) را بسنج. فقط با JSON پاسخ بده: "
         '{"score": عدد ۰ تا ۱۰۰, "reason": "دلیل این امتیاز"}. '
         "به قصد کاربر و همخوانی نیازش با محصول دقت کن."
+        f"{fb_block}"
     )
     user = f"محصول:\n{state['product']}\n\nتحلیل فرد:\n{state['analysis']}"
     res, acc = _run(state, config.DEEP_MODEL, config.DEEP_PRICE, Fit, system, user)
@@ -146,11 +158,11 @@ def build():
 
 graph = build()
 
-def evaluate(product, message, context=None, source="نامشخص"):
+def evaluate(product, message, context=None, source="نامشخص", feedback_examples=None):
     init = {
         "product": product, "message": message, "source": source, "context": context or [],
         "triage": None, "analysis": None, "fit": None, "draft": None, "review": None,
-        "revision_count": 0, "stage": "", "tokens": 0, "cost": 0.0,
+        "revision_count": 0, "feedback_examples": feedback_examples or [], "stage": "", "tokens": 0, "cost": 0.0,
     }
     try:
         return graph.invoke(init)

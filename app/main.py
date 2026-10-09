@@ -15,6 +15,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+import threading
 from . import auth, db
 from .agent import evaluate
 
@@ -27,6 +28,10 @@ MAX_QUOTA = 1000  # سقف مصرف کلی برای کاربر
 
 app = FastAPI(title="Lead Finder")
 db.init()
+
+# پیشرفت لحظه‌ای تحلیل، به ازای هر کاربر (فقط برای یک پردازه؛ با --workers=1 اجرا شود)
+PROGRESS = {}
+PROGRESS_LOCK = threading.Lock()
 
 # تنظیمات Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -140,16 +145,34 @@ def process(request: Request, body: AnalyzeIn, user=Depends(auth.current_user)):
     if not messages:
         raise HTTPException(400, "no messages")
 
+    examples = db.feedback_examples(user["id"])
+    total = len(messages)
+    with PROGRESS_LOCK:
+        PROGRESS[user["id"]] = {"done": 0, "total": total}
+
     def work(i):
         context = messages[max(0, i - CONTEXT_WINDOW):i]
-        # ارسال نام پلتفرم به ایجنت
-        return evaluate(product[0]["text"], messages[i], context, body.source)
+        result = evaluate(product[0]["text"], messages[i], context, body.source, examples)
+        with PROGRESS_LOCK:
+            PROGRESS[user["id"]]["done"] += 1
+        return result
 
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        states = list(pool.map(work, range(len(messages))))
-    ids = [_store(user["id"], t, s) for t, s in zip(messages, states)]
-    
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            states = list(pool.map(work, range(len(messages))))
+        ids = [_store(user["id"], t, s) for t, s in zip(messages, states)]
+    finally:
+        with PROGRESS_LOCK:
+            PROGRESS.pop(user["id"], None)
+
     return {"ids": ids, "usage": {"current": current_usage + len(messages), "max": MAX_QUOTA}}
+
+
+@app.get("/api/progress")
+def progress(user=Depends(auth.current_user)):
+    with PROGRESS_LOCK:
+        p = PROGRESS.get(user["id"])
+    return p or {"done": 0, "total": 0}
 
 @app.get("/api/results")
 def results(only_leads: bool = False, user=Depends(auth.current_user)):

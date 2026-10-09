@@ -57,6 +57,18 @@ h2{font-size:clamp(24px,3.2vw,34px);font-weight:800;line-height:1.6;margin-botto
 .nums b{display:block;font-size:42px;font-weight:800;color:var(--gold);line-height:1.4}
 .nums span{color:#C7D1E6;font-size:15px}
 .fine{margin-top:16px;font-size:13px;color:var(--mute)}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.pl{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:26px}
+.pl.hi{border-color:var(--blue);box-shadow:0 20px 40px -24px rgba(31,63,216,.35);position:relative}
+.pl.hi::before{content:'پیشنهادی';position:absolute;top:-12px;right:22px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;padding:3px 12px;border-radius:99px}
+.pl h3{font-size:17px;margin-bottom:6px}
+.pl .price{font-size:28px;font-weight:800;margin:8px 0 4px}
+.pl .price small{font-size:13px;font-weight:400;color:var(--mute)}
+.pl p.d{color:var(--mute);font-size:13.5px;margin-bottom:16px}
+.pl ul{list-style:none;padding:0;margin:0 0 20px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.pl ul li{display:flex;gap:8px;align-items:flex-start}
+.pl ul li::before{content:'✓';color:var(--blue);font-weight:800;flex:none}
+.pl .btn{width:100%}
 .band{background:var(--tint);border-radius:26px;padding:44px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
 footer{padding:34px 0 40px;color:var(--mute);font-size:13.5px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
 dialog{border:0;border-radius:22px;padding:28px;width:min(92vw,410px);color:var(--ink);box-shadow:0 40px 80px -30px rgba(18,32,58,.55);margin:auto}
@@ -84,7 +96,7 @@ dialog .btn{width:100%;padding:13px}
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="10" fill="#1F3FD8"/><path d="M8 11h18M12 17h10" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M15 23h4" stroke="#F4B223" stroke-width="2.8" stroke-linecap="round"/></svg>
       نشانه
     </a>
-    <div class="links"><a href="#how">روش کار</a><a href="#nums">نتیجه‌ها</a></div>
+    <div class="links"><a href="#how">روش کار</a><a href="#nums">نتیجه‌ها</a><a href="#pricing">قیمت‌گذاری</a></div>
     <button class="btn o open">ورود / ثبت‌نام</button>
   </nav>
 
@@ -138,6 +150,35 @@ dialog .btn{width:100%;padding:13px}
       <div><b>≈ ۰٫۰۰۳</b><span>واحد اعتبار، هزینه‌ی بررسی کامل یک مشتری واقعی تا آماده شدن پاسخ</span></div>
     </div>
     <p class="fine">این اعداد از اجرای آزمایشی روی ۸ پیام نمونه به‌دست آمده، نه یک ارزیابی آماری بزرگ. در داشبورد خودتان، هزینه و دقت با داده‌ی واقعی و بازخورد خودتان محاسبه و به‌روز می‌شود.</p>
+  </section>
+
+  <section id="pricing">
+    <span class="eyebrow">قیمت‌گذاری</span>
+    <h2 style="margin-bottom:10px">همان مدلی که برای کسب‌وکار خودتان هم منطقی است</h2>
+    <p class="sub">چون هزینه‌ی واقعی نشانه به ازای هر پیام بسیار پایین است، می‌توانیم رایگان شروع کنیم و فقط از کسب‌وکارهایی که واقعاً مشتری پیدا می‌کنند سهم بگیریم.</p>
+    <div class="plans">
+      <div class="pl">
+        <h3>شروع</h3>
+        <div class="price">رایگان</div>
+        <p class="d">برای امتحان کردن با یک گروه</p>
+        <ul><li>تا ۵۰ پیام در ماه</li><li>یک پروفایل محصول</li><li>داشبورد هزینه و دقت</li></ul>
+        <button class="btn o open">شروع رایگان</button>
+      </div>
+      <div class="pl hi">
+        <h3>حرفه‌ای</h3>
+        <div class="price">۴۹۰<small> هزار تومان / ماه</small></div>
+        <p class="d">برای تیم فروش یک کسب‌وکار کوچک</p>
+        <ul><li>تا ۲٬۰۰۰ پیام در ماه</li><li>چند پروفایل محصول</li><li>خروجی گزارش فرصت‌ها</li><li>یادگیری از بازخورد تیم</li></ul>
+        <button class="btn p open">شروع کن</button>
+      </div>
+      <div class="pl">
+        <h3>سازمانی</h3>
+        <div class="price">گفت‌وگو</div>
+        <p class="d">برای حجم بالا و اتصال به چند گروه هم‌زمان</p>
+        <ul><li>پیام نامحدود</li><li>اتصال مستقیم به API شما</li><li>پشتیبانی اختصاصی</li></ul>
+        <button class="btn o open">تماس با ما</button>
+      </div>
+    </div>
   </section>
 
   <section>
