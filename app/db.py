@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS wallets(
 CREATE TABLE IF NOT EXISTS reports(
     id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('bug', 'suggestion')),
     title TEXT NOT NULL, description TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
-    CHECK(status IN ('pending', 'approved', 'rejected')), admin_note TEXT,
+    admin_note TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP, reviewed_at TEXT);
 CREATE TABLE IF NOT EXISTS wallet_transactions(
     id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, report_id INTEGER UNIQUE,
